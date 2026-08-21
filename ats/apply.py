@@ -16,6 +16,10 @@ from ats.greenhouse import fill_application as fill_greenhouse
 from ats.lever import fill_application as fill_lever
 from ats.workday import fill_application as fill_workday
 from ats.icims import fill_application as fill_icims
+from ats.jazzhr import fill_application as fill_jazzhr
+from ats.smartrecruiters import fill_application as fill_smartrecruiters
+from ats.taleo import fill_application as fill_taleo
+from ats.successfactors import fill_application as fill_successfactors
 from db.database import set_application_status
 
 HANDLERS = {
@@ -23,6 +27,10 @@ HANDLERS = {
     "lever": fill_lever,
     "workday": fill_workday,
     "icims": fill_icims,
+    "jazzhr": fill_jazzhr,
+    "smartrecruiters": fill_smartrecruiters,
+    "taleo": fill_taleo,
+    "successfactors": fill_successfactors,
 }
 
 

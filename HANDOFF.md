@@ -1,16 +1,84 @@
 # job-bot — Handoff
 
-Rewritten 2026-08-21, after this chat session's **third** `[bio]` platform
-block (Sonnet 5 safety classifier — cause unknown from the assistant side
-each time, no visibility into what trips it). Given the recurring pattern
-within this one session, the recommendation was to actually start a new
-session rather than keep pushing against it. This document exists so a new
-session (or a different AI instance) can pick up cleanly with zero context
-loss.
+Originally rewritten 2026-08-21 after a prior chat session hit three `[bio]`
+platform blocks and recommended starting fresh. That new session picked
+this up cleanly and made real progress the same day — see "Session 2" below
+for what changed. This document exists so any session (or a different AI
+instance) can pick up cleanly with zero context loss.
 
 **Nothing about the actual project is broken.** Every number below was
 verified against real state right before writing this — check yourself
 before trusting anything that reads as stale.
+
+## Session 2 (2026-08-21, same day): ATS platform research resolved
+
+Picked up item 2 and item 3 from the to-do list below. Live-inspected six
+ATS platforms against real, current job postings (not documentation) to
+settle exactly which ones are automatable:
+
+- **Workday** — confirmed, definitively: every path through "Start Your
+  Application" (Autofill with Resume, Apply Manually, *and* Use My Last
+  Application — checked all three) leads to a mandatory "Create
+  Account/Sign In" step before any application field appears. This is
+  Workday's own shared account UI (`data-automation-id="createAccountSubmitButton"`),
+  not a tenant customization, so it's universal. `ats/workday.py` now
+  detects this gate live (clicks Apply → Apply Manually, checks for the
+  account-creation selectors) and hands off honestly instead of guessing.
+- **iCIMS** — confirmed against a live General Dynamics Mission Systems
+  posting. Content loads inside a same-origin iframe; the first step is an
+  email-capture gate (`#email`) that's also hCaptcha-protected on this
+  tenant. `ats/icims.py` now finds the iframe, pre-fills the email (safe —
+  just typing text), and flags the GDPR checkbox + hCaptcha for the human
+  rather than touching either.
+- **JazzHR** (`*.applytojob.com`) — **fully automatable, real handler
+  built** (`ats/jazzhr.py`). No account gate. Verified against a live
+  Labelmaster/American Labelmark posting: standard `resumator-*`-prefixed
+  field IDs (name/email/phone/address/resume) are platform-wide, not
+  per-tenant. Custom questions, EEOC voluntary self-ID, and the "Human
+  Check" reCAPTCHA (which only blocks final submit, which this project
+  never does anyway) are surfaced for human review.
+- **SmartRecruiters** (`jobs.smartrecruiters.com` "Easy Apply") — form
+  structure verified against a live Intuitive posting (no account gate,
+  standard fields, shadow-DOM rendering that Playwright's selector engine
+  pierces fine). **But** driving the actual navigation through Playwright
+  — both headless and headed — got blocked by SmartRecruiters' own bot
+  detection ("Access is temporarily restricted... Automated (bot)
+  activity") before the form ever loaded, the same category of wall as
+  ZipRecruiter's Cloudflare block. `ats/smartrecruiters.py` fills the known
+  fields *if* it reaches them, but checks for this block first and reports
+  it honestly rather than silently returning an empty review list (an
+  actual bug caught and fixed this session — an empty list would have made
+  `ats/apply.py`'s orchestrator claim "Auto-filled, ready to review" even
+  though nothing was touched). Whether it works at all in practice is
+  unverified — every attempt this session got walled before reaching the
+  form.
+- **Taleo** (`*.taleo.net`) — confirmed blocked the same way as Workday:
+  "Apply Online" leads straight to a Login/New User page before anything
+  else, verified against a live Herman Miller/PMG posting. `ats/taleo.py`
+  detects this and hands off.
+- **SuccessFactors** (`*.successfactors.com`) — confirmed blocked the same
+  way, verified live ("Career Opportunities: Sign In" / "Create an account
+  to apply"). `ats/successfactors.py` detects this and hands off.
+
+All six are wired into `ats/detect.py` (`PLATFORM_PATTERNS`) and
+`ats/apply.py` (`HANDLERS`) — 8 platforms total now recognized, up from 4.
+Every handler still follows the unbroken project rule: fill what's safely
+fillable, never touch consent checkboxes or CAPTCHAs, never create
+accounts, never submit.
+
+**Smoke-tested after the fact, through the project's real Playwright
+pipeline** (not just the browser tool used for initial inspection):
+`jazzhr.py` genuinely fills real fields on a live posting — confirmed
+working. `smartrecruiters.py` hit SmartRecruiters' own bot detection on
+every attempt (headless and headed), which is what led to fixing the
+empty-review-list bug noted above — its field-filling code is unverified
+in practice pending a way past that wall (which, per the CAPTCHA/Cloudflare
+rule, isn't something to force). `workday.py`/`icims.py`/`taleo.py`/
+`successfactors.py` weren't re-run through the pipeline since they just
+detect a gate and stop — the browser-tool verification of the gate itself
+is the substance of what they do. Still worth a real dashboard "Prepare &
+Open" click against a live queued job at some point, but the core logic
+has been exercised.
 
 ## What this project is
 
@@ -129,16 +197,27 @@ this is fully working now, don't redo the setup).
   `resume/parser.py` extracts contact fields for ATS forms; `render_pdf.py`
   renders the two edited `.md` versions (the original is never regenerated
   through this pipeline, stays byte-identical to what he typed).
-- **ATS handlers** (`ats/`): `greenhouse.py` and `lever.py` are real, tested
-  against live postings — fill name/email/phone/LinkedIn/resume, never
-  submit, surface custom questions/CAPTCHA for human review. `workday.py`
-  and `icims.py` are **honest stubs**. See the dedicated memory file:
-  `~/.claude/projects/-Users-simondelibero-Desktop-txt-papers-1/memory/job_bot_workday_icims_todo.md`
-  — includes a failed 2026-08-21 live-inspection attempt (a page-opened
-  popup in the browser tool, likely Workday SSO/sign-in, blocked all further
-  navigation; the tool isn't permitted to drive or close popups like that).
-  Try a different Workday tenant/posting next time, and iCIMS hasn't been
-  attempted at all yet.
+- **ATS handlers** (`ats/`), 8 platforms recognized in `ats/detect.py` /
+  `ats/apply.py`:
+  - **Real, fillable handlers** (verified live end-to-end through the actual
+    Playwright pipeline, no account/CAPTCHA gate blocks reaching the form):
+    `greenhouse.py`, `lever.py`, `jazzhr.py` (`*.applytojob.com`). Each
+    fills name/email/phone/resume/etc., never submits, surfaces custom
+    questions/CAPTCHA/voluntary self-ID for human review.
+  - **Field structure known, but bot-detection blocks automated access to
+    it**: `smartrecruiters.py` (`jobs.smartrecruiters.com` Easy Apply) —
+    the form itself has no account gate and is genuinely fillable when
+    reached by a human, but SmartRecruiters' own bot detection walled off
+    every Playwright-driven attempt (headless and headed) before the form
+    loaded. Same category as ZipRecruiter's Cloudflare block — not
+    something to bypass. The handler is defensive (detects the block,
+    reports it honestly) but hasn't actually filled a real form yet.
+  - **Honest gate-detectors** (account creation is structurally required
+    before any application field appears, confirmed live, not guessed):
+    `workday.py`, `icims.py` (email step also hCaptcha-gated on the tenant
+    tested), `taleo.py`, `successfactors.py`. These detect the gate and
+    hand off rather than attempting fields they can't reach — see
+    "Session 2" above for what was actually tested and why.
 - **Dashboard** (`dashboard/app.py`, port 5151): `/` = home (site/mode
   picker, sweep launcher via `dashboard/run_sweep_bg.py`, live status from
   `dashboard/.sweep_lock.json` — gitignored, ephemeral). `/queue` = the job
@@ -155,12 +234,16 @@ this list exists as a clean starting point):
 
 1. **Government jobs** — USAJobs.gov integration is built (see above), needs
    an API key + live test to actually verify it before trusting it.
-2. **Troubleshoot the Workday/iCIMS hangup precisely** — Workday's specific
-   failure mode is known (popup blocks browser tool navigation, see above).
-   iCIMS hasn't been attempted at all — that's a clean first step.
-3. **Find other ATS platforms like Workday/iCIMS** — Taleo (Oracle),
-   SuccessFactors (SAP), SmartRecruiters, JazzHR, and similar are the
-   obvious candidates; not researched yet.
+2. ~~**Troubleshoot the Workday/iCIMS hangup precisely**~~ — **Done, Session
+   2.** Both confirmed to have structural account/CAPTCHA gates, not tool
+   glitches. See "Session 2" above.
+3. ~~**Find other ATS platforms like Workday/iCIMS**~~ — **Done, Session 2.**
+   JazzHR turned out fully automatable (real handler, smoke-tested
+   end-to-end through Playwright — works). SmartRecruiters looked the same
+   at first but its own bot detection blocks automated access to the form;
+   handler is defensive but unverified in practice. Taleo and
+   SuccessFactors are gated the same way as Workday (account creation
+   required). See "Session 2" above.
 4. **National Labs section** — DOE national labs (Livermore, Los Alamos,
    Oak Ridge, PNNL, Sandia, Argonne, Fermilab, Brookhaven, SLAC, etc.).
    Worth noting: **PNNL (Pacific Northwest National Laboratory) is

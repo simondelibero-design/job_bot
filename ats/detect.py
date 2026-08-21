@@ -6,6 +6,10 @@ PLATFORM_PATTERNS = {
     "lever": re.compile(r"jobs\.lever\.co", re.I),
     "workday": re.compile(r"\.myworkdayjobs\.com", re.I),
     "icims": re.compile(r"\.icims\.com", re.I),
+    "jazzhr": re.compile(r"\.applytojob\.com", re.I),
+    "smartrecruiters": re.compile(r"\.smartrecruiters\.com", re.I),
+    "taleo": re.compile(r"\.taleo\.net", re.I),
+    "successfactors": re.compile(r"\.successfactors\.(com|eu)", re.I),
 }
 
 
