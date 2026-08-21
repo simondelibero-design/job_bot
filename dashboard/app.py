@@ -15,6 +15,9 @@ from db.database import get_conn, restore_job, set_application_status  # noqa: E
 
 ROOT = Path(__file__).parent.parent
 RESUME_DIR = ROOT / "resume"
+SWEEP_LOCK_PATH = Path(__file__).parent / ".sweep_lock.json"
+VALID_SITES = ["indeed", "ziprecruiter", "usajobs"]
+VALID_MODES = ["local", "remote", "life_change"]
 STATUS_TABS = [
     "needs_review", "discovered", "submitted", "skipped", "rejected",
     "excluded", "semi_excluded", "likely_excluded", "remote", "life_change", "all",
@@ -32,8 +35,60 @@ def available_resumes():
     return sorted(p.stem for p in RESUME_DIR.glob("*.md"))
 
 
+def sweep_status():
+    if not SWEEP_LOCK_PATH.exists():
+        return None
+    try:
+        return json.loads(SWEEP_LOCK_PATH.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 @app.route("/")
-def index():
+def home():
+    with get_conn() as conn:
+        total = conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"]
+        by_mode = {r["search_mode"] or "local": r["c"] for r in conn.execute(
+            "SELECT search_mode, COUNT(*) c FROM jobs GROUP BY search_mode"
+        )}
+        queued = conn.execute(
+            "SELECT COUNT(*) c FROM jobs JOIN applications ON applications.job_id = jobs.id "
+            "WHERE jobs.excluded = 0"
+        ).fetchone()["c"]
+
+    return render_template(
+        "home.html",
+        total=total,
+        by_mode=by_mode,
+        queued=queued,
+        sites=VALID_SITES,
+        modes=VALID_MODES,
+        sweep=sweep_status(),
+    )
+
+
+@app.route("/run-sweep", methods=["POST"])
+def run_sweep():
+    current = sweep_status()
+    if current and current.get("status") == "running":
+        return redirect(url_for("home"))  # already running — don't stack another one
+
+    selected_sites = request.form.getlist("sites") or VALID_SITES
+    selected_modes = request.form.getlist("modes") or VALID_MODES
+
+    subprocess.Popen(
+        [
+            sys.executable, str(Path(__file__).parent / "run_sweep_bg.py"),
+            "--modes", ",".join(selected_modes),
+            "--sites", ",".join(selected_sites),
+        ],
+        cwd=str(ROOT),
+    )
+    return redirect(url_for("home"))
+
+
+@app.route("/queue")
+def queue():
     status_filter = request.args.get("status", "needs_review")
     with get_conn() as conn:
         query = (
@@ -87,7 +142,7 @@ def prepare(job_id):
 
     if not row or not row["url"]:
         set_application_status(job_id, "needs_review", notes="No URL on file — find/apply manually")
-        return redirect(request.referrer or url_for("index"))
+        return redirect(request.referrer or url_for("queue"))
 
     # Detached: the dashboard request returns immediately, the browser
     # window stays open independently until the user closes it.
@@ -95,7 +150,7 @@ def prepare(job_id):
         [sys.executable, str(ROOT / "ats" / "apply.py"), str(job_id), row["url"], str(resume_path)],
         cwd=str(ROOT),
     )
-    return redirect(request.referrer or url_for("index"))
+    return redirect(request.referrer or url_for("queue"))
 
 
 @app.route("/job/<int:job_id>/action", methods=["POST"])
@@ -111,7 +166,7 @@ def action(job_id):
         restore_job(job_id)
     elif action_name in status_map:
         set_application_status(job_id, status_map[action_name])
-    return redirect(request.referrer or url_for("index"))
+    return redirect(request.referrer or url_for("queue"))
 
 
 if __name__ == "__main__":

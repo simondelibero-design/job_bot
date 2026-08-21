@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>job-bot</title>
+<style>
+  :root {
+    --bg: #f7f7f8; --card: #ffffff; --border: #e2e2e6; --text: #1a1a1e;
+    --muted: #6b6b76; --accent: #2f6fed; --good: #1f9254; --warn: #b9860a;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px;
+              border-bottom: 1px solid #f0f0f0; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .n { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .checks label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+  button.primary {
+    background: var(--accent); color: white; border: none; border-radius: 6px;
+    padding: 10px 16px; font-size: 14px; cursor: pointer; width: 100%;
+  }
+  button.primary:disabled { background: #b7c6ef; cursor: not-allowed; }
+  .banner { border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+  .banner.running { background: #fff2d9; color: var(--warn); }
+  .banner.done { background: #e3f6ec; color: var(--good); }
+  .banner.error { background: #fbe6e2; color: #c4432b; }
+  .queue-link { display: inline-block; margin-top: 20px; color: var(--accent); text-decoration: none; font-size: 14px; }
+  .queue-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <h1>job-bot</h1>
+  <div class="sub">Pick which sites and modes to sweep, then review results in the queue.</div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Database</h2>
+      <div class="stat-row"><span>Total jobs discovered</span><span class="n">{{ total }}</span></div>
+      <div class="stat-row"><span>In review queue</span><span class="n">{{ queued }}</span></div>
+      <div class="stat-row"><span>Local</span><span class="n">{{ by_mode.get('local', 0) }}</span></div>
+      <div class="stat-row"><span>Remote</span><span class="n">{{ by_mode.get('remote', 0) }}</span></div>
+      <div class="stat-row"><span>Life change</span><span class="n">{{ by_mode.get('life_change', 0) }}</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Run a discovery sweep</h2>
+
+      {% if sweep %}
+        {% if sweep.status == 'running' %}
+          <div class="banner running">Sweep running — mode: {{ sweep.get('current_mode', '?') }}, sites: {{ sweep.sites | join(', ') }}. Refresh to check progress.</div>
+        {% elif sweep.status == 'done' %}
+          <div class="banner done">Last sweep finished — modes: {{ sweep.modes | join(', ') }}, sites: {{ sweep.sites | join(', ') }}.</div>
+        {% elif sweep.status == 'error' %}
+          <div class="banner error">Last sweep hit an error — check dashboard/run_sweep_bg.py output, or the .sweep_lock.json file for the traceback.</div>
+        {% endif %}
+      {% endif %}
+
+      <form method="post" action="{{ url_for('run_sweep') }}">
+        <div class="checks">
+          <strong style="font-size:13px; color:var(--muted);">Sites to comb through</strong>
+          {% for s in sites %}
+            <label><input type="checkbox" name="sites" value="{{ s }}" checked> {{ s }}</label>
+          {% endfor %}
+        </div>
+        <div class="checks">
+          <strong style="font-size:13px; color:var(--muted);">Modes</strong>
+          {% for m in modes %}
+            <label><input type="checkbox" name="modes" value="{{ m }}" checked> {{ m.replace('_', ' ') }}</label>
+          {% endfor %}
+        </div>
+        <button class="primary" type="submit" {% if sweep and sweep.status == 'running' %}disabled{% endif %}>
+          {% if sweep and sweep.status == 'running' %}Sweep already running…{% else %}Start Sweep{% endif %}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <a class="queue-link" href="{{ url_for('queue') }}">Go to review queue →</a>
+</body>
+</html>

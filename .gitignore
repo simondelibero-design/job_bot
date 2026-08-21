@@ -8,6 +8,7 @@ __pycache__/
 scrapers/ziprecruiter_auth.json
 scrapers/ziprecruiter_profile/
 scrapers/ziprecruiter_cookies_raw.json
+scrapers/usajobs_credentials.json
 
 # Scraped job data — regenerable via `python main.py`, and churns on every
 # discovery run, which would make for noisy diffs. Remove this line if you
@@ -15,3 +16,6 @@ scrapers/ziprecruiter_cookies_raw.json
 db/jobs.db
 
 .DS_Store
+
+# Home page's sweep-in-progress tracker — ephemeral runtime state
+dashboard/.sweep_lock.json

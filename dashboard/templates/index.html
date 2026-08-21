@@ -45,11 +45,14 @@
 </head>
 <body>
   <h1>job-bot review queue</h1>
-  <div class="sub">Nothing here submits automatically — "Prepare &amp; Open" fills a real browser window; you review and click submit yourself.</div>
+  <div class="sub">
+    Nothing here submits automatically — "Prepare &amp; Open" fills a real browser window; you review and click submit yourself.
+    · <a href="{{ url_for('home') }}">← Home</a>
+  </div>
 
   <div class="tabs">
     {% for tab in tabs %}
-      <a href="{{ url_for('index', status=tab) }}" class="{{ 'active' if tab == status_filter else '' }}">{{ tab.replace('_', ' ') }}</a>
+      <a href="{{ url_for('queue', status=tab) }}" class="{{ 'active' if tab == status_filter else '' }}">{{ tab.replace('_', ' ') }}</a>
     {% endfor %}
   </div>
 

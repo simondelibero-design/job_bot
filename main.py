@@ -23,6 +23,7 @@ from config import LOCATION, SEARCH_KEYWORDS
 from db.database import init_db, upsert_job, top_jobs
 from matcher.scorer import score_job
 from scrapers.indeed import search_indeed
+from scrapers.usajobs import search_usajobs
 from scrapers.ziprecruiter import search_ziprecruiter
 
 # ZipRecruiter auth: either a persistent browser profile from
@@ -40,27 +41,44 @@ def _zip_auth_kwargs() -> dict:
     }
 
 
+VALID_SITES = {"indeed", "ziprecruiter", "usajobs"}
+
+
 def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
-                headless: bool) -> int:
+                headless: bool, sites: list[str] | None = None) -> int:
+    sites = set(sites) if sites else VALID_SITES
+    unknown = sites - VALID_SITES
+    if unknown:
+        raise ValueError(f"Unknown site(s): {unknown}. Valid: {VALID_SITES}")
+
     total_found = 0
     for keyword in keywords:
-        print(f"[{mode}][indeed] searching: {keyword}")
-        try:
-            indeed_jobs = search_indeed(keyword, location_query, radius, headless=headless)
-        except Exception as e:
-            print(f"  indeed search failed for '{keyword}': {e}")
-            indeed_jobs = []
+        found_this_keyword = []
 
-        print(f"[{mode}][ziprecruiter] searching: {keyword}")
-        try:
-            zip_jobs = search_ziprecruiter(
-                keyword, location_query, radius, headless=headless, **_zip_auth_kwargs(),
-            )
-        except Exception as e:
-            print(f"  ziprecruiter search failed for '{keyword}': {e}")
-            zip_jobs = []
+        if "indeed" in sites:
+            print(f"[{mode}][indeed] searching: {keyword}")
+            try:
+                found_this_keyword += search_indeed(keyword, location_query, radius, headless=headless)
+            except Exception as e:
+                print(f"  indeed search failed for '{keyword}': {e}")
 
-        for job in indeed_jobs + zip_jobs:
+        if "ziprecruiter" in sites:
+            print(f"[{mode}][ziprecruiter] searching: {keyword}")
+            try:
+                found_this_keyword += search_ziprecruiter(
+                    keyword, location_query, radius, headless=headless, **_zip_auth_kwargs(),
+                )
+            except Exception as e:
+                print(f"  ziprecruiter search failed for '{keyword}': {e}")
+
+        if "usajobs" in sites:
+            print(f"[{mode}][usajobs] searching: {keyword}")
+            try:
+                found_this_keyword += search_usajobs(keyword, location_query, radius)
+            except Exception as e:
+                print(f"  usajobs search failed for '{keyword}': {e}")
+
+        for job in found_this_keyword:
             result = score_job(
                 job["title"], job.get("snippet", ""), job.get("location"),
                 mode=mode, salary=job.get("salary"),
@@ -75,30 +93,30 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
     return total_found
 
 
-def run_discovery(keywords=None, headless: bool = True):
+def run_discovery(keywords=None, headless: bool = True, sites: list[str] | None = None):
     """Local sweep: distance-tiered around home base."""
     init_db()
     keywords = keywords or SEARCH_KEYWORDS
-    total = _run_sweep(keywords, LOCATION["query"], LOCATION["radius_miles"], "local", headless)
+    total = _run_sweep(keywords, LOCATION["query"], LOCATION["radius_miles"], "local", headless, sites)
     print(f"\n[local] Done. {total} listings processed this run.")
 
 
-def run_remote_discovery(keywords=None, headless: bool = True):
+def run_remote_discovery(keywords=None, headless: bool = True, sites: list[str] | None = None):
     """Nationwide/US-remote sweep, high-selectivity (REMOTE_MIN_SCORE)."""
     init_db()
     keywords = keywords or SEARCH_KEYWORDS
     # radius is meaningless for "Remote" as a location, but pass a large
     # value rather than 0 — untested whether either site would interpret
     # radius=0 as "exact point only" and over-narrow results.
-    total = _run_sweep(keywords, "Remote", 100, "remote", headless)
+    total = _run_sweep(keywords, "Remote", 100, "remote", headless, sites)
     print(f"\n[remote] Done. {total} listings processed this run.")
 
 
-def run_life_change_discovery(keywords=None, headless: bool = True):
+def run_life_change_discovery(keywords=None, headless: bool = True, sites: list[str] | None = None):
     """Nationwide relocation-open sweep, filtered on relevance + pay."""
     init_db()
     keywords = keywords or SEARCH_KEYWORDS
-    total = _run_sweep(keywords, "United States", 100, "life_change", headless)
+    total = _run_sweep(keywords, "United States", 100, "life_change", headless, sites)
     print(f"\n[life_change] Done. {total} listings processed this run.")
 
 
