@@ -1,0 +1,17 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Real ZipRecruiter session data — cookies/browser profile are effectively
+# login credentials. Never commit these, private repo or not.
+scrapers/ziprecruiter_auth.json
+scrapers/ziprecruiter_profile/
+scrapers/ziprecruiter_cookies_raw.json
+
+# Scraped job data — regenerable via `python main.py`, and churns on every
+# discovery run, which would make for noisy diffs. Remove this line if you
+# want the DB itself tracked in git.
+db/jobs.db
+
+.DS_Store

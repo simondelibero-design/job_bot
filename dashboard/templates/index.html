@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>job-bot review queue</title>
+<style>
+  :root {
+    --bg: #f7f7f8; --card: #ffffff; --border: #e2e2e6; --text: #1a1a1e;
+    --muted: #6b6b76; --accent: #2f6fed; --good: #1f9254; --bad: #c4432b;
+    --warn: #b9860a;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tabs a { padding: 6px 12px; border-radius: 6px; text-decoration: none; color: var(--text);
+            border: 1px solid var(--border); font-size: 13px; background: var(--card); }
+  .tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 16px; margin-bottom: 12px; }
+  .row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .title { font-weight: 600; font-size: 15px; }
+  .company { color: var(--muted); font-size: 13px; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .score { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+           font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+  .badge.needs_review { background: #fff2d9; color: var(--warn); }
+  .badge.discovered { background: #e8eaf6; color: #3949ab; }
+  .badge.submitted { background: #e3f6ec; color: var(--good); }
+  .badge.skipped, .badge.rejected { background: #fbe6e2; color: var(--bad); }
+  .notes { font-size: 13px; margin-top: 8px; color: var(--text); background: #faf7ee;
+           border: 1px solid #eee0bb; border-radius: 6px; padding: 8px 10px; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+  select, button, .link-btn {
+    font-size: 13px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); cursor: pointer; color: var(--text); text-decoration: none;
+  }
+  button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  button.good { background: var(--good); color: white; border-color: var(--good); }
+  button.bad { background: transparent; color: var(--bad); border-color: var(--bad); }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>job-bot review queue</h1>
+  <div class="sub">Nothing here submits automatically — "Prepare &amp; Open" fills a real browser window; you review and click submit yourself.</div>
+
+  <div class="tabs">
+    {% for tab in tabs %}
+      <a href="{{ url_for('index', status=tab) }}" class="{{ 'active' if tab == status_filter else '' }}">{{ tab.replace('_', ' ') }}</a>
+    {% endfor %}
+  </div>
+
+  {% if not jobs %}
+    <div class="card empty">No jobs in this view.</div>
+  {% endif %}
+
+  {% for job in jobs %}
+    <div class="card">
+      <div class="row-top">
+        <div>
+          <div class="title">{{ job.title }}</div>
+          <div class="company">{{ job.company or 'Unknown company' }} — {{ job.location or 'location n/a' }}</div>
+        </div>
+        <div>
+          <span class="badge {{ job.app_status }}">{{ job.app_status.replace('_', ' ') }}</span>
+        </div>
+      </div>
+      <div class="meta">
+        Score <span class="score">{{ '%.0f'|format(job.score) }}</span>
+        · Source: {{ job.source }}
+        · ATS: {{ job.ats_platform or 'not detected yet' }}
+        {% if job.salary %} · {{ job.salary }}{% endif %}
+      </div>
+
+      {% if job.notes %}
+        <div class="notes">Needs: {{ job.notes }}</div>
+      {% endif %}
+      {% if status_filter in phd_tabs and job.matched_keywords %}
+        <div class="notes">Filtered because: {{ job.matched_keywords | join(', ') }}</div>
+      {% endif %}
+
+      <div class="actions">
+        {% if status_filter in phd_tabs %}
+          {% if job.url %}<a class="link-btn" href="{{ job.url }}" target="_blank" rel="noopener">Open posting</a>{% endif %}
+          <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+            <input type="hidden" name="action" value="restore">
+            <button class="good" type="submit">Restore</button>
+          </form>
+        {% elif job.url %}
+          <a class="link-btn" href="{{ job.url }}" target="_blank" rel="noopener">Open posting</a>
+          <form method="post" action="{{ url_for('prepare', job_id=job.id) }}" style="display:flex; gap:6px;">
+            <select name="resume">
+              {% for r in resumes %}
+                <option value="{{ r }}" {% if r == default_resume %}selected{% endif %}>{{ r }}</option>
+              {% endfor %}
+            </select>
+            <button class="primary" type="submit">Prepare &amp; Open</button>
+          </form>
+        {% else %}
+          <span class="meta">No URL captured — find and apply manually.</span>
+        {% endif %}
+
+        {% if status_filter not in phd_tabs %}
+        <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+          <input type="hidden" name="action" value="mark_submitted">
+          <button class="good" type="submit">Mark Submitted</button>
+        </form>
+        <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+          <input type="hidden" name="action" value="skip">
+          <button type="submit">Skip</button>
+        </form>
+        <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+          <input type="hidden" name="action" value="reject">
+          <button class="bad" type="submit">Reject</button>
+        </form>
+        {% if job.app_status != 'needs_review' %}
+        <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+          <input type="hidden" name="action" value="requeue">
+          <button type="submit">Requeue</button>
+        </form>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</body>
+</html>

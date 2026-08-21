@@ -1,0 +1,223 @@
+"""Search scope and priority configuration. Edit freely as your targets change."""
+
+LOCATION = {
+    "city": "Milton",
+    "state": "WA",
+    "query": "1410 10th Ave, Milton, WA 98354",
+    "radius_miles": 45,
+}
+
+# Distance-tiered relevance filtering: close jobs are cheap to consider, so
+# we're loose about field-relevance; far jobs cost real commute time, so they
+# need to actually match your fields. Checked in order, first tier whose
+# max_miles covers the job's distance wins. Jobs whose location we can't
+# resolve to a distance (see matcher/distance.py) default to the last tier
+# ("far") — the strictest — rather than being treated as conveniently close.
+DISTANCE_TIERS = [
+    {"name": "close", "max_miles": 10, "min_score": 0},   # accept everything
+    {"name": "mid", "max_miles": 20, "min_score": 1},     # light filter — almost any match counts
+    {"name": "far", "max_miles": 45, "min_score": 3},     # full field-relevance filter
+]
+
+# Search terms sent to Indeed / ZipRecruiter. Keep these as realistic job-title
+# phrases people actually search, not just field names.
+SEARCH_KEYWORDS = [
+    # core degree fields
+    "physics", "applied physics", "engineering", "chemistry", "materials science",
+    "computer science", "mathematics",
+    # additional adjacent fields
+    "electrical engineering", "mechanical engineering", "aerospace engineering",
+    "nuclear engineering", "biomedical engineering", "environmental engineering",
+    "geophysics", "metallurgy",
+    # roles / job titles
+    "research scientist", "research engineer", "R&D engineer", "engineering technician",
+    "drafting technician", "CAD technician", "lab technician", "wet lab technician",
+    "test engineer", "quality engineer", "QA engineer", "process engineer",
+    "manufacturing engineer", "controls engineer", "systems engineer",
+    "instrumentation engineer", "metrology technician", "calibration technician",
+    "simulation engineer", "modeling engineer", "data scientist",
+    "nondestructive testing technician", "NDT technician", "cleanroom technician",
+    # specific domains called out
+    "quantum computing", "quantum engineer", "particle accelerator",
+    "accelerator physics", "aerospace engineer", "optics engineer", "photonics engineer",
+    "RF engineer", "semiconductor engineer", "nanofabrication",
+    # broadened: biomedical/biotech
+    "biotechnology", "biomedical technician", "biotech research associate",
+    "pharmaceutical scientist", "process development engineer",
+    # broadened: renewable energy
+    "renewable energy engineer", "solar engineer", "battery engineer",
+    "energy storage engineer", "photovoltaic engineer",
+    # broadened: robotics/automation
+    "robotics engineer", "automation engineer", "mechatronics engineer",
+    "controls technician",
+    # broadened: environmental
+    "environmental scientist", "environmental technician",
+    "water quality technician", "environmental compliance",
+    # broadened: government/defense/naval (JBLM, Bangor sub base, Puget Sound shipyard nearby)
+    "defense contractor engineer", "systems integration engineer",
+    "test and evaluation engineer", "naval engineer", "marine engineer",
+    "shipyard engineer",
+    # broadened: data/ML
+    "data analyst", "data engineer", "machine learning engineer",
+    # broadened: semiconductor fab depth
+    "process integration engineer", "yield engineer", "fab technician",
+    # round 2: civil/structural (real AutoCAD Civil 3D / drafting experience)
+    "civil engineer", "structural engineer", "civil engineering technician",
+    "geotechnical engineer",
+    # round 2: patent/IP (real posting seen for this exact niche)
+    "patent agent", "patent examiner", "technical writer", "IP paralegal",
+    # round 2: acoustics/inspection (real welding/NDT background)
+    "acoustics engineer", "welding inspector", "welding engineer",
+    # round 2: field/technical sales (leverages communication + technical depth)
+    "field application engineer", "technical sales engineer", "applications engineer",
+    "sales engineer",
+    # round 2: actuarial/quant (leverages math + MCM modeling background)
+    "actuarial analyst", "quantitative analyst",
+    # round 2: STEM education/outreach (real Club Z tutoring background)
+    "stem outreach coordinator", "science education specialist", "curriculum developer",
+]
+
+# Case-insensitive substring match against title + snippet. Weight scale is
+# arbitrary (higher = ranked first); tune once real results start coming in.
+SECTOR_WEIGHTS = {
+    "quantum": 10,
+    "particle accelerator": 10,
+    "accelerator physics": 10,
+    "photonics": 9,
+    "optics": 9,
+    "aerospace": 9,
+    "semiconductor": 8,
+    "nanofabrication": 8,
+    "materials science": 8,
+    "materials scientist": 8,
+    "physics": 8,
+    "physicist": 8,
+    "nuclear": 7,
+    "rf engineer": 7,
+    "metrology": 7,
+    "instrumentation": 7,
+    "wet lab": 7,
+    "r&d": 7,
+    "research scientist": 7,
+    "research engineer": 7,
+    "chemistry": 6,
+    "chemist": 6,
+    "computer science": 5,
+    "data scientist": 5,
+    "mathematics": 5,
+    "mechanical engineer": 5,
+    "electrical engineer": 5,
+    "systems engineer": 5,
+    "test engineer": 4,
+    "quality engineer": 4,
+    "process engineer": 4,
+    "controls engineer": 4,
+    "manufacturing engineer": 4,
+    "simulation": 4,
+    "engineering technician": 3,
+    "drafting technician": 3,
+    "cad technician": 3,
+    "lab technician": 3,
+    "calibration technician": 3,
+    "cleanroom technician": 3,
+    "ndt": 3,
+    "nondestructive testing": 3,
+    # broadened categories
+    "battery": 7,
+    "energy storage": 7,
+    "renewable energy": 7,
+    "machine learning": 6,
+    "robotics": 6,
+    "mechatronics": 6,
+    "biotechnology": 6,
+    "biomedical": 6,
+    "defense": 6,
+    "naval": 6,
+    "marine engineer": 6,
+    "shipyard": 6,
+    "solar": 6,
+    "photovoltaic": 6,
+    "automation": 5,
+    "environmental science": 5,
+    "environmental engineer": 5,
+    "systems integration": 5,
+    "test and evaluation": 5,
+    "process integration": 5,
+    "yield engineer": 5,
+    "pharmaceutical": 5,
+    "data analyst": 4,
+    "data engineer": 4,
+    "fab technician": 4,
+    # round 2
+    "civil engineer": 6,
+    "structural engineer": 6,
+    "geotechnical engineer": 6,
+    "patent agent": 6,
+    "patent examiner": 6,
+    "acoustics engineer": 6,
+    "actuarial analyst": 5,
+    "quantitative analyst": 5,
+    "welding inspector": 5,
+    "welding engineer": 5,
+    "field application engineer": 5,
+    "technical sales engineer": 5,
+    "applications engineer": 5,
+    "sales engineer": 4,
+    "civil engineering technician": 4,
+    "technical writer": 4,
+    "stem outreach": 4,
+    "science education": 4,
+    "curriculum developer": 3,
+}
+
+# Applied against title + snippet; any match drops the score to 0 and flags
+# the job as excluded rather than deleting it (keeps the log complete).
+# Unrelated to the PhD system below — this is for things like unpaid roles,
+# plus other categorical credential gates a bachelor's-level applicant can't
+# clear regardless of field-relevance score. "Medical Physicist" specifically
+# requires a CAMPEP-accredited graduate program + board certification — it
+# scores high on "physics" keyword match but is realistically unreachable,
+# and (unlike the PhD-only roles) the postings never say "PhD" so the PhD
+# system doesn't catch them. Same logic for PE-licensed and MD-required roles.
+EXCLUDE_KEYWORDS = [
+    "unpaid", "internship, no pay", "commission only",
+    # credential-gated roles (not PhD-specific, so not part of the PHD_* lists)
+    "medical physicist", "board certified physicist", "campep accredited",
+    "professional engineer license required", "pe license required",
+    "active professional license required", "medical residency required",
+    "completion of residency required", "licensed physician required",
+    "md required",
+]
+
+# Three-tier PhD system, checked in this order — first match wins, no
+# overlap. A job with zero PhD-related language is untouched by any of this.
+#   1. PHD_REQUIRED_KEYWORDS  -> phd_flag "excluded"       (hard-excluded, hidden)
+#   2. PHD_PREFERRED_KEYWORDS -> phd_flag "semi_excluded"  (soft signal, own tab)
+#   3. bare "phd"/"ph.d" mention not caught above -> phd_flag "likely_excluded" (own tab)
+# "(ph.d.)" / "(phd)" as a title suffix is a strong, common real-world
+# convention (seen live: "Metallurgical Engineer (Ph.D.)", "Manager,
+# Materials Science (Ph.D.)") for roles that are PhD-only.
+PHD_REQUIRED_KEYWORDS = [
+    "phd required", "ph.d. required", "doctorate required",
+    "requires a phd", "requires a ph.d", "phd or equivalent required",
+    "doctoral degree required", "(ph.d.)", "(phd)",
+    # "postdoc" titles categorically require an already-completed PhD, even
+    # when the posting never spells out "PhD" as a word.
+    "postdoctoral", "post-doctoral", "postdoc",
+]
+PHD_PREFERRED_KEYWORDS = [
+    "phd preferred", "ph.d. preferred", "phd a plus", "phd is a plus",
+    "phd desired", "doctorate preferred", "preferably phd", "phd strongly preferred",
+]
+
+MIN_SCORE_TO_QUEUE = 3  # kept for the "far" distance tier's threshold
+
+# Remote sweep: no natural distance cap since it's not geography-limited, so
+# it needs its own high-selectivity bar instead of the distance tiers.
+REMOTE_MIN_SCORE = 9
+
+# life_change sweep: nationwide, relocation-open, filtered on both real
+# field-relevance AND pay. "specialization" = SEARCH_KEYWORDS above — the
+# same growing list used everywhere else, not a separate list to maintain.
+LIFE_CHANGE_MIN_SCORE = 6
+LIFE_CHANGE_MIN_SALARY = 90000  # estimated annual; see matcher/salary.py
