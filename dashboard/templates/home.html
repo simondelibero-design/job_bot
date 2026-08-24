@@ -22,6 +22,19 @@
   .stat-row .n { font-weight: 600; font-variant-numeric: tabular-nums; }
   .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
   .checks label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+  .site-group { border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; }
+  .site-group summary {
+    padding: 8px 10px; font-size: 13px; cursor: pointer; list-style: none; display: flex;
+    align-items: center; gap: 8px; color: var(--muted);
+  }
+  .site-group summary::-webkit-details-marker { display: none; }
+  .site-group summary::before { content: "▸"; font-size: 10px; margin-right: 2px; }
+  .site-group[open] summary::before { content: "▾"; }
+  .site-group .group-body {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px;
+    padding: 4px 10px 10px 30px;
+  }
+  .group-select { display: flex; align-items: center; }
   button.primary {
     background: var(--accent); color: white; border: none; border-radius: 6px;
     padding: 10px 16px; font-size: 14px; cursor: pointer; width: 100%;
@@ -153,9 +166,39 @@
       <form method="post" action="{{ url_for('run_sweep') }}">
         <div class="checks">
           <strong style="font-size:13px; color:var(--muted);">Sites to comb through</strong>
-          {% for s in sites %}
+          {% for s in general_sites %}
             <label><input type="checkbox" name="sites" value="{{ s }}" checked> {{ s }}</label>
           {% endfor %}
+
+          <details class="site-group" open>
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="national-labs" checked>
+              </span>
+              National Labs ({{ national_lab_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in national_lab_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="national-labs" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+
+          {% if other_national_lab_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="other-national-labs" checked>
+              </span>
+              Other National Labs ({{ other_national_lab_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in other_national_lab_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="other-national-labs" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
         </div>
         <div class="checks">
           <strong style="font-size:13px; color:var(--muted);">Modes</strong>
@@ -276,6 +319,27 @@
   });
 
   renderPie();
+})();
+
+(function() {
+  // Site-group "select all" checkboxes in the sweep launcher — check/uncheck
+  // every checkbox in that group, and keep the group checkbox itself synced
+  // (checked only when every item in the group is checked) if the user
+  // toggles individual sites by hand instead.
+  document.querySelectorAll('.group-toggle').forEach(function(toggle) {
+    var group = toggle.dataset.group;
+    var items = Array.prototype.slice.call(document.querySelectorAll('.group-item[data-group="' + group + '"]'));
+
+    toggle.addEventListener('change', function() {
+      items.forEach(function(item) { item.checked = toggle.checked; });
+    });
+
+    items.forEach(function(item) {
+      item.addEventListener('change', function() {
+        toggle.checked = items.every(function(i) { return i.checked; });
+      });
+    });
+  });
 })();
 </script>
 </body>

@@ -18,7 +18,16 @@ from db.database import get_conn, restore_job, set_application_status  # noqa: E
 ROOT = Path(__file__).parent.parent
 RESUME_DIR = ROOT / "resume"
 SWEEP_LOCK_PATH = Path(__file__).parent / ".sweep_lock.json"
-VALID_SITES = ["indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal", "aps", "llnl", "lanl", "bnl", "slac", "ornl", "snl"]
+# Alphabetized within each group. National labs are split into two
+# collapsible groups on the home page: the ones this project had scrapers
+# for first ("National Labs") vs. the rest of the US's DOE labs added
+# later ("Other National Labs") — see HANDOFF.md for which session added
+# which. New lab sources should get added to OTHER_NATIONAL_LAB_SITES
+# (alphabetized) rather than the first group, to keep that history legible.
+GENERAL_SITES = ["aps", "indeed", "usajobs", "ziprecruiter"]
+NATIONAL_LAB_SITES = ["anl", "bnl", "fnal", "lanl", "llnl", "ornl", "pnnl", "slac", "snl"]
+OTHER_NATIONAL_LAB_SITES = []
+VALID_SITES = GENERAL_SITES + NATIONAL_LAB_SITES + OTHER_NATIONAL_LAB_SITES
 VALID_MODES = ["local", "remote", "life_change"]
 STATUS_TABS = [
     "needs_review", "discovered", "submitted", "skipped", "rejected",
@@ -63,7 +72,9 @@ def home():
         total=total,
         by_mode=by_mode,
         queued=queued,
-        sites=VALID_SITES,
+        general_sites=GENERAL_SITES,
+        national_lab_sites=NATIONAL_LAB_SITES,
+        other_national_lab_sites=OTHER_NATIONAL_LAB_SITES,
         modes=VALID_MODES,
         sweep=sweep_status(),
         distance=load_distance_settings(),
