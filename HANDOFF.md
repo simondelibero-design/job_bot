@@ -101,16 +101,16 @@ Location: `~/Desktop/job-bot/`. **Pushed to a private GitHub repo**:
 https://github.com/simondelibero-design/job_bot (see Git section below —
 this is fully working now, don't redo the setup).
 
-## Current real state (verified 2026-08-24, commit `de3eca9`)
+## Current real state (verified 2026-08-24, commit `3f7ea30`)
 
-- **3,258 jobs** in `db/jobs.db`: 1,554 local, 1,199 remote, 505 life_change.
-  The 1,057→1,199 remote bump is real postings from smoke-testing each new
+- **3,264 jobs** in `db/jobs.db`: 1,554 local, 1,205 remote, 505 life_change.
+  The 1,057→1,205 remote bump is real postings from smoke-testing each new
   national-lab/APS scraper end-to-end (1-2 keyword tests each, not full
   sweeps) — everything else is the original full 99-keyword Indeed+
   ZipRecruiter sweep from 2026-08-21, not a partial/test run. A real full
-  sweep with all sources enabled hasn't been run yet — worth doing once
-  ORNL/SNL land too, to get proper multi-keyword coverage from all the new
-  sources rather than just the 1-2 keywords each got smoke-tested with.
+  sweep with all sources enabled hasn't been run yet — worth doing to get
+  proper multi-keyword coverage from all the new sources rather than just
+  the 1-2 keywords each got smoke-tested with.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
   `cd ~/Desktop/job-bot && source venv/bin/activate && python dashboard/app.py`
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
@@ -163,18 +163,21 @@ this is fully working now, don't redo the setup).
     verification.
   - `scrapers/pnnl.py`, `scrapers/anl.py`, `scrapers/fnal.py`,
     `scrapers/bnl.py`, `scrapers/llnl.py`, `scrapers/lanl.py`,
-    `scrapers/slac.py`, `scrapers/aps.py` — **all real, live-tested,
-    working** (2026-08-24, see "Session 2" above for what each one found
-    and why). All are plain public JSON-API or unauthenticated-HTML
-    scrapers, no Playwright/browser automation needed for any of them, no
-    bot-detection fought or bypassed anywhere. All ignore
-    `location`/`radius_miles` (each is a single employer's postings or a
-    non-geographic board) — accepted only for interface parity with the
-    other `search_*` functions.
+    `scrapers/slac.py`, `scrapers/ornl.py`, `scrapers/snl.py`,
+    `scrapers/aps.py` — **all real, live-tested, working** (2026-08-24,
+    see "Session 2" above for what each one found and why). All but one
+    are plain public JSON-API or unauthenticated-HTML scrapers, no
+    Playwright/browser automation needed; `scrapers/snl.py` (Sandia) is
+    the one exception — its ATS has neither an API nor scrapeable static
+    HTML, so it's a genuine Playwright scraper, same tier as `indeed.py`.
+    No bot-detection fought or bypassed anywhere across any of these. All
+    ignore `location`/`radius_miles` (each is a single employer's postings
+    or a non-geographic board) — accepted only for interface parity with
+    the other `search_*` functions.
   - `main.py`'s `_run_sweep()` takes a `sites` list (`indeed`,
     `ziprecruiter`, `usajobs`, `pnnl`, `anl`, `fnal`, `aps`, `llnl`,
-    `lanl`, `bnl`, `slac`) so any subset can be searched — this is what
-    the home page's checkboxes control.
+    `lanl`, `bnl`, `slac`, `ornl`, `snl`) so any subset can be searched —
+    this is what the home page's checkboxes control.
 - **Scoring** (`matcher/scorer.py`, `config.py`):
   - `SEARCH_KEYWORDS` / `SECTOR_WEIGHTS` — the "specialization" list (grown
     across multiple rounds: core physics/engineering/chem/materials/CS/math,
@@ -268,8 +271,8 @@ this list exists as a clean starting point):
    handler is defensive but unverified in practice. Taleo and
    SuccessFactors are gated the same way as Workday (account creation
    required). See "Session 2" above.
-4. ~~**National Labs section**~~ — **7 of 8 done, Session 2 (2026-08-24),
-   parallelized across 4 background agents + this session.** DOE national
+4. ~~**National Labs section**~~ — **All 8 done, Session 2 (2026-08-24),
+   parallelized across 5 background agents + this session.** DOE national
    labs are contractor-operated, so USAJobs.gov doesn't cover them; each
    needed its own source, same process as Indeed/ZipRecruiter/Greenhouse/
    Lever before. All of the below are wired into `main.py` (`VALID_SITES`,
@@ -305,12 +308,28 @@ this list exists as a clean starting point):
      Cloud Recruiting via Stanford's own infrastructure
      (careersearch.stanford.edu) — a structurally different, but still
      public/unauthenticated, REST API.
-   - None of these APIs expose a structured salary field — every one of
-     these six modules honestly reports `salary: None` rather than
-     regex-guessing a number out of free-text descriptions.
-   - **Oak Ridge (ORNL) and Sandia (SNL) still pending** — a background
-     agent was still working on these as of this write-up; check for its
-     results and wire them in the same way if not already done.
+   - **Oak Ridge/ORNL** (`scrapers/ornl.py`) — runs SAP SuccessFactors
+     "Jobs2Web," which server-renders full HTML with no JS execution
+     needed — a plain `requests` + regex scraper, no API but no wall
+     either.
+   - **Sandia/SNL** (`scrapers/snl.py`) — the one lab with no usable API
+     *and* no clean static HTML: it's Oracle PeopleSoft Fluid HCM
+     "Candidate Gateway," whose search returns a proprietary `text/xml`
+     partial-page-update protocol, not REST/JSON, with content filled in
+     by client-side JS after a stateful POST handshake. But there's no
+     bot-detection wall, so this is a genuine Playwright scraper (like
+     `indeed.py`) that drives the real search box and clicks through each
+     result's detail view via the built-in "Next Job" button — the only
+     one of the 8 labs needing a browser rather than a plain HTTP request.
+     Documented, honest limitation: PeopleSoft Fluid exposes no stable
+     per-posting URL at all (confirmed live — a guessed direct-link scheme
+     returns "not authorized"), so every result's `url` points at the
+     general search app rather than a specific posting; a human re-searches
+     by Job ID there.
+   - Only Sandia publishes structured salary data (via its detail page's
+     "Salary Range" section, when the posting includes one) — every other
+     lab honestly reports `salary: None` rather than regex-guessing a
+     number out of free-text descriptions.
 5. ~~**NSF section**~~ — **Done, Session 2.** Researched and correctly
    concluded no scraper is warranted: NSF-funded opportunities (distinct
    from direct NSF employment, which USAJobs already covers) are posted
