@@ -101,7 +101,7 @@ Location: `~/Desktop/job-bot/`. **Pushed to a private GitHub repo**:
 https://github.com/simondelibero-design/job_bot (see Git section below —
 this is fully working now, don't redo the setup).
 
-## Current real state (verified 2026-08-24, commit `3f7ea30`)
+## Current real state (verified 2026-08-24, commit `6daa6ac`)
 
 - **3,264 jobs** in `db/jobs.db`: 1,554 local, 1,205 remote, 505 life_change.
   The 1,057→1,205 remote bump is real postings from smoke-testing each new
@@ -271,7 +271,7 @@ this list exists as a clean starting point):
    handler is defensive but unverified in practice. Taleo and
    SuccessFactors are gated the same way as Workday (account creation
    required). See "Session 2" above.
-4. ~~**National Labs section**~~ — **All 8 done, Session 2 (2026-08-24),
+4. ~~**National Labs section**~~ — **All 9 done, Session 2 (2026-08-24),
    parallelized across 5 background agents + this session.** DOE national
    labs are contractor-operated, so USAJobs.gov doesn't cover them; each
    needed its own source, same process as Indeed/ZipRecruiter/Greenhouse/
