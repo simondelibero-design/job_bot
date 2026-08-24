@@ -5,9 +5,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from config import (
-    DISTANCE_TIERS, DISTANCE_WEIGHT_PERCENT, EXCLUDE_KEYWORDS, LIFE_CHANGE_MIN_SALARY,
-    LIFE_CHANGE_MIN_SCORE, MAX_PROXIMITY_BONUS, PHD_PREFERRED_KEYWORDS, PHD_REQUIRED_KEYWORDS,
-    REMOTE_MIN_SCORE, SECTOR_WEIGHTS, SENIORITY_EXCLUDE_KEYWORDS,
+    DISTANCE_TIERS, EXCLUDE_KEYWORDS, LIFE_CHANGE_MIN_SALARY, LIFE_CHANGE_MIN_SCORE,
+    MAX_PROXIMITY_BONUS, PHD_PREFERRED_KEYWORDS, PHD_REQUIRED_KEYWORDS, REMOTE_MIN_SCORE,
+    SECTOR_WEIGHTS, SENIORITY_EXCLUDE_KEYWORDS, TIER_WEIGHTS,
 )
 from matcher.distance import estimate_distance_miles
 from matcher.salary import parse_salary_annual
@@ -37,26 +37,23 @@ def _tier_min_score(tier_name: str) -> float:
     return DISTANCE_TIERS[-1]["min_score"]
 
 
-def priority_score(score: float, distance_miles: float | None) -> float:
-    """career-field score, plus a distance-proximity bonus layered on top —
-    never a replacement for the field-relevance score above, which is what
-    the exclusion gates in score_job() actually check. Only meaningful for
-    "local" mode jobs with a resolved distance; remote/life_change jobs
-    (distance_miles is always None for those) and unresolvable locations
-    get no bonus, so priority_score == score for them regardless of the
-    DISTANCE_WEIGHT_PERCENT setting.
+def priority_score(score: float, tier: str | None) -> float:
+    """career-field score, plus a flat per-tier priority bonus layered on
+    top — never a replacement for the field-relevance score above, which is
+    what the exclusion gates in score_job() actually check.
 
-    At weight 0%: identical to score (distance has no effect on ranking).
-    At weight 100%: a job right at the home address gets the full
-    MAX_PROXIMITY_BONUS added; a job at or beyond the "far" tier's outer
-    limit gets none. Linear in between."""
-    if distance_miles is None:
+    Each tier's bonus is TIER_WEIGHTS[tier] normalized against the sum of
+    all four weights, times MAX_PROXIMITY_BONUS — i.e. the same "pie chart"
+    proportions shown on the dashboard, driven by the four weight sliders
+    there. A tier that's 0% of the pie gets no bonus at all; a tier that's
+    100% of the pie (all others at 0) gets the full MAX_PROXIMITY_BONUS.
+    "remote" isn't one of the four weighted tiers, so remote-mode jobs
+    always get 0 regardless of these settings — same as an unrecognized/
+    unresolved tier."""
+    total_weight = sum(TIER_WEIGHTS.values())
+    if not total_weight or tier not in TIER_WEIGHTS:
         return score
-    far_max_miles = DISTANCE_TIERS[-1]["max_miles"]
-    if far_max_miles <= 0:
-        return score
-    proximity_fraction = max(0.0, 1 - (distance_miles / far_max_miles))
-    bonus = (DISTANCE_WEIGHT_PERCENT / 100) * MAX_PROXIMITY_BONUS * proximity_fraction
+    bonus = (TIER_WEIGHTS[tier] / total_weight) * MAX_PROXIMITY_BONUS
     return score + bonus
 
 
@@ -119,9 +116,9 @@ def score_job(title: str, snippet: str = "", location: str | None = None,
       - "remote": flat high-selectivity score threshold, no geography
       - "life_change": score threshold AND a minimum estimated salary
     Returns: score, matched, excluded, phd_flag, distance_miles, tier,
-    salary_annual_est, priority_score (score plus a distance-proximity
-    bonus — see priority_score() above — this is what the queue sorts by,
-    score itself stays pure field-relevance for the exclusion gates)."""
+    salary_annual_est, priority_score (score plus a per-tier priority bonus
+    — see priority_score() above — this is what the queue sorts by, score
+    itself stays pure field-relevance for the exclusion gates)."""
     text = f"{title} {snippet}".lower()
 
     if mode == "local":
@@ -136,7 +133,7 @@ def score_job(title: str, snippet: str = "", location: str | None = None,
         shared["distance_miles"] = distance_miles
         shared["tier"] = tier
         shared["salary_annual_est"] = salary_annual_est
-        shared["priority_score"] = priority_score(shared["score"], distance_miles)
+        shared["priority_score"] = priority_score(shared["score"], tier)
         return shared
 
     # Recompute score/matched (cheap, avoids threading extra state through
@@ -174,5 +171,5 @@ def score_job(title: str, snippet: str = "", location: str | None = None,
         "score": score, "matched": matched, "excluded": excluded,
         "phd_flag": None, "distance_miles": distance_miles, "tier": tier,
         "salary_annual_est": salary_annual_est,
-        "priority_score": priority_score(score, distance_miles),
+        "priority_score": priority_score(score, tier),
     }

@@ -78,8 +78,8 @@ def save_distance_settings():
             value = float(request.form.get(key, default))
         except (TypeError, ValueError):
             value = default
-        if key == "distance_weight_percent":
-            settings[key] = min(100.0, max(0.0, value))  # 0 = distance has no effect on ranking
+        if key.endswith("_weight"):
+            settings[key] = min(100.0, max(0.0, value))  # 0 = this tier gets no ranking boost at all
         else:
             settings[key] = max(0.1, value)  # no zero/negative-mile tiers
 

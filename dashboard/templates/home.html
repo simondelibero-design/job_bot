@@ -7,7 +7,7 @@
   :root {
     --bg: #16171d; --card: #1f212a; --border: #33353f; --text: #eaeaef;
     --muted: #9a9ca8; --accent: #4d82f3; --good: #22a35f; --warn: #f2b84d;
-    --bad: #ff6b5c;
+    --bad: #ff6b5c; --purple: #a06df0;
   }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
@@ -47,8 +47,16 @@
   .unit-toggle { display: flex; gap: 14px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
   .unit-toggle label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
   .weight-row { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); }
-  .weight-labels { display: flex; justify-content: space-between; font-size: 11px;
-                    color: var(--muted); margin: -6px 0 14px 88px; }
+  .weight-layout { display: flex; gap: 18px; align-items: center; }
+  .pie-wrap { flex-shrink: 0; }
+  .pie { width: 90px; height: 90px; border-radius: 50%; background: conic-gradient(var(--border) 0 100%);
+         box-shadow: 0 0 0 1px var(--border); }
+  .weight-sliders { flex: 1; min-width: 0; }
+  .weight-slider-row { margin-bottom: 8px; gap: 8px; }
+  .weight-slider-row label { width: 62px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .pie-pct { font-size: 11px; color: var(--muted); width: 34px; text-align: right; flex-shrink: 0;
+             font-variant-numeric: tabular-nums; }
   button.secondary {
     background: transparent; color: var(--accent); border: 1px solid var(--accent);
     border-radius: 6px; padding: 8px 14px; font-size: 13px; cursor: pointer; width: 100%;
@@ -97,24 +105,30 @@
 
           <div class="weight-row">
             <div class="dist-hint" style="margin-top:0;">
-              How much proximity should nudge a job's rank in the queue, on top of the
-              career-field match it already needs to clear the tiers above — 0% ranks purely by
-              field relevance, 100% gives a job right next door the same boost as matching an
-              extra top-tier keyword.
+              Relative ranking-priority boost per tier, layered on top of the career-field
+              match a job already needs to clear the tiers above. Bigger slice = bigger boost
+              for jobs in that tier; a slice at 0 gets none. These are proportions relative to
+              each other, not fixed percentages — they don't need to add up to 100, drag any
+              one slider and the pie rebalances automatically.
             </div>
-            <div class="dist-row">
-              <label for="distance_weight_percent_range">Priority</label>
-              <input type="range" id="distance_weight_percent_range" min="0" max="100" step="0.1"
-                     value="{{ distance.distance_weight_percent }}"
-                     oninput="document.getElementById('distance_weight_percent_num').value = this.value">
-              <input type="number" name="distance_weight_percent" id="distance_weight_percent_num"
-                     min="0" max="100" step="0.1" value="{{ distance.distance_weight_percent }}"
-                     oninput="document.getElementById('distance_weight_percent_range').value = this.value">
-              <span class="unit">%</span>
-            </div>
-            <div class="weight-labels">
-              <span>Field relevance only</span>
-              <span>Distance matters most</span>
+            <div class="weight-layout">
+              <div class="pie-wrap"><div class="pie" id="priority-pie"></div></div>
+              <div class="weight-sliders">
+                {% for key, label, color in [
+                  ('close_weight', 'Close', 'var(--accent)'), ('mid_weight', 'Meh', 'var(--good)'),
+                  ('far_weight', 'Far', 'var(--warn)'), ('life_change_weight', 'Life-change', 'var(--purple)'),
+                ] %}
+                <div class="dist-row weight-slider-row">
+                  <span class="swatch" style="background:{{ color }};"></span>
+                  <label for="{{ key }}_range">{{ label }}</label>
+                  <input type="range" class="weight-input" data-key="{{ key }}" id="{{ key }}_range"
+                         min="0" max="100" step="0.1" value="{{ distance[key] }}">
+                  <input type="number" name="{{ key }}" class="weight-input" data-key="{{ key }}" id="{{ key }}_num"
+                         min="0" max="100" step="0.1" value="{{ distance[key] }}">
+                  <span class="pie-pct" id="{{ key }}_pct">—</span>
+                </div>
+                {% endfor %}
+              </div>
             </div>
           </div>
 
@@ -217,6 +231,51 @@
       document.getElementById(key + '_num').value = milesValues[key];
     });
   });
+
+  // Priority pie chart — driven live by the 4 weight sliders. Raw weight
+  // values don't need to sum to 100; the pie (and the % labels next to each
+  // slider) always shows each one's share of the current total.
+  var WEIGHT_KEYS = ['close_weight', 'mid_weight', 'far_weight', 'life_change_weight'];
+  var WEIGHT_COLORS = {
+    close_weight: 'var(--accent)', mid_weight: 'var(--good)',
+    far_weight: 'var(--warn)', life_change_weight: 'var(--purple)',
+  };
+
+  function renderPie() {
+    var values = WEIGHT_KEYS.map(function(key) {
+      return Math.max(0, parseFloat(document.getElementById(key + '_num').value) || 0);
+    });
+    var total = values.reduce(function(a, b) { return a + b; }, 0);
+
+    if (total <= 0) {
+      document.getElementById('priority-pie').style.background = 'var(--border)';
+      WEIGHT_KEYS.forEach(function(key) {
+        document.getElementById(key + '_pct').textContent = '0%';
+      });
+      return;
+    }
+
+    var stops = [];
+    var cursor = 0;
+    WEIGHT_KEYS.forEach(function(key, i) {
+      var pct = (values[i] / total) * 100;
+      var start = cursor;
+      var end = cursor + pct;
+      stops.push(WEIGHT_COLORS[key] + ' ' + start + '% ' + end + '%');
+      document.getElementById(key + '_pct').textContent = Math.round(pct) + '%';
+      cursor = end;
+    });
+    document.getElementById('priority-pie').style.background = 'conic-gradient(' + stops.join(', ') + ')';
+  }
+
+  WEIGHT_KEYS.forEach(function(key) {
+    var numEl = document.getElementById(key + '_num');
+    var rangeEl = document.getElementById(key + '_range');
+    numEl.addEventListener('input', function() { rangeEl.value = numEl.value; renderPie(); });
+    rangeEl.addEventListener('input', function() { numEl.value = rangeEl.value; renderPie(); });
+  });
+
+  renderPie();
 })();
 </script>
 </body>

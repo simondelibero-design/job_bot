@@ -10,14 +10,16 @@ SETTINGS_PATH = Path(__file__).parent / "dashboard" / "settings.json"
 DEFAULT_DISTANCE_SETTINGS = {
     "close_max_miles": 10, "mid_max_miles": 20, "far_max_miles": 45,
     "life_change_radius_miles": 100,
-    # 0-100. How much a job's proximity should nudge its rank in the queue,
-    # layered on top of (never replacing) the career-field relevance score
-    # that's already used for exclusion. 0 = pure field-relevance ranking,
-    # distance ignored for sorting (still used for the tier exclusion gates
-    # above); 100 = a job right next door gets the full MAX_PROXIMITY_BONUS
-    # added to its score, roughly equivalent to matching one more top-tier
-    # SECTOR_WEIGHTS keyword. See matcher/scorer.py's priority_score.
-    "distance_weight_percent": 30,
+    # Relative priority weights, one per tier — shown as a live pie chart on
+    # the dashboard, driven by 4 sliders (one per tier). Each is just a raw
+    # number; what matters is the *proportion* one takes up against the
+    # other three, not its absolute value, so they don't need to be
+    # hand-balanced to sum to 100 — normalized automatically wherever they're
+    # used (see TIER_WEIGHTS / matcher/scorer.py's priority_score). A tier
+    # with 0 gets no ranking boost at all. Defaults taper off with distance,
+    # but every tier is independently adjustable — there's nothing stopping
+    # you from weighting "far" above "close" if that's ever what you want.
+    "close_weight": 40, "mid_weight": 30, "far_weight": 20, "life_change_weight": 10,
 }
 MAX_PROXIMITY_BONUS = 10  # comparable to the top SECTOR_WEIGHTS entries (quantum, particle accelerator: 10)
 
@@ -71,8 +73,17 @@ DISTANCE_TIERS = [
 # from the dashboard, same mechanism as the tiers above.
 LIFE_CHANGE_SEARCH_RADIUS_MILES = _distance_settings["life_change_radius_miles"]
 
-# See DEFAULT_DISTANCE_SETTINGS above for what this controls.
-DISTANCE_WEIGHT_PERCENT = _distance_settings["distance_weight_percent"]
+# Keyed by the same tier-name strings score_job() already produces: "close"/
+# "mid"/"far" for local-mode jobs, "life_change" for that mode (which tags
+# its own tier with the mode name — see matcher/scorer.py). "remote" isn't
+# one of the four weighted categories, so remote-mode jobs always get 0
+# here regardless of these settings — there's no pie slice for it.
+TIER_WEIGHTS = {
+    "close": _distance_settings["close_weight"],
+    "mid": _distance_settings["mid_weight"],
+    "far": _distance_settings["far_weight"],
+    "life_change": _distance_settings["life_change_weight"],
+}
 
 # Search terms sent to Indeed / ZipRecruiter. Keep these as realistic job-title
 # phrases people actually search, not just field names.
