@@ -10,6 +10,11 @@ PLATFORM_PATTERNS = {
     "smartrecruiters": re.compile(r"\.smartrecruiters\.com", re.I),
     "taleo": re.compile(r"\.taleo\.net", re.I),
     "successfactors": re.compile(r"\.successfactors\.(com|eu)", re.I),
+    "aps": re.compile(r"apsphysicsjobs\.com", re.I),
+    "lanl": re.compile(r"lanl\.jobs", re.I),
+    "ornl": re.compile(r"jobs\.ornl\.gov", re.I),
+    "slac": re.compile(r"careersearch\.stanford\.edu", re.I),
+    "snl": re.compile(r"sandia\.gov", re.I),
 }
 
 

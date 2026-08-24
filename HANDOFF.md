@@ -224,13 +224,27 @@ this is fully working now, don't redo the setup).
   `resume/parser.py` extracts contact fields for ATS forms; `render_pdf.py`
   renders the two edited `.md` versions (the original is never regenerated
   through this pipeline, stays byte-identical to what he typed).
-- **ATS handlers** (`ats/`), 8 platforms recognized in `ats/detect.py` /
-  `ats/apply.py`:
+- **ATS handlers** (`ats/`), 13 platforms recognized in `ats/detect.py` /
+  `ats/apply.py` (up from 8 — the 5 new ones cover the national-lab/APS
+  discovery sources added earlier this session, "in-fill" work done at the
+  user's request, Session 2 continued):
   - **Real, fillable handlers** (verified live end-to-end through the actual
     Playwright pipeline, no account/CAPTCHA gate blocks reaching the form):
-    `greenhouse.py`, `lever.py`, `jazzhr.py` (`*.applytojob.com`). Each
-    fills name/email/phone/resume/etc., never submits, surfaces custom
+    `greenhouse.py`, `lever.py`, `jazzhr.py` (`*.applytojob.com`),
+    `aps.py` (apsphysicsjobs.com — first/last/email/resume fill directly
+    into an in-page form, no redirect out to the employer's own site; the
+    required "covering message" field is left for the human, same
+    reasoning as not answering custom questions generically). Each fills
+    name/email/phone/resume/etc., never submits, surfaces custom
     questions/CAPTCHA/voluntary self-ID for human review.
+  - **Partial-fill handlers** (a real gate exists, but the one safe field
+    in front of it — email — gets pre-filled): `icims.py` (email step also
+    hCaptcha-gated on the tenant tested), `slac.py`
+    (careersearch.stanford.edu — a lighter "Let's get started" email +
+    required-T&C-checkbox gate than Workday's, live inside its own iframe;
+    the checkbox and a hidden honeypot field are both deliberately left
+    untouched — the honeypot exists specifically to catch bots that fill
+    every field they find).
   - **Field structure known, but bot-detection blocks automated access to
     it**: `smartrecruiters.py` (`jobs.smartrecruiters.com` Easy Apply) —
     the form itself has no account gate and is genuinely fillable when
@@ -241,10 +255,21 @@ this is fully working now, don't redo the setup).
     reports it honestly) but hasn't actually filled a real form yet.
   - **Honest gate-detectors** (account creation is structurally required
     before any application field appears, confirmed live, not guessed):
-    `workday.py`, `icims.py` (email step also hCaptcha-gated on the tenant
-    tested), `taleo.py`, `successfactors.py`. These detect the gate and
-    hand off rather than attempting fields they can't reach — see
-    "Session 2" above for what was actually tested and why.
+    `workday.py`, `taleo.py`, `successfactors.py`, `ornl.py` (a
+    SuccessFactors-style sign-in gate, but on a hostname —
+    career-hcm20.ns2cloud.com — `ats/detect.py`'s `successfactors` pattern
+    doesn't match, hence its own module), `snl.py` (Sandia — *two*
+    compounding blockers: no stable per-posting URL exists at all in its
+    PeopleSoft Fluid ATS, on top of the same account-creation wall).
+  - **Bot-wall gate-detector** (not an account-creation gate, a request
+    that gets rejected outright): `lanl.py` — every LANL posting's "Apply"
+    link routes to a completely different system (jobsp1.lanl.gov, Oracle
+    iRecruitment) than the one `scrapers/lanl.py` discovers postings from,
+    and that system returns "Request Rejected" to a plain navigation — an
+    F5-style bot wall, confirmed live, not fought or spoofed.
+  - See "Session 2" above for what was actually tested and why on the
+    original 8; the 5 new ones follow the identical live-verify-first
+    methodology.
 - **Dashboard** (`dashboard/app.py`, port 5151): `/` = home (site/mode
   picker, sweep launcher via `dashboard/run_sweep_bg.py`, live status from
   `dashboard/.sweep_lock.json` — gitignored, ephemeral). `/queue` = the job

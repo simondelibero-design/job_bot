@@ -20,6 +20,11 @@ from ats.jazzhr import fill_application as fill_jazzhr
 from ats.smartrecruiters import fill_application as fill_smartrecruiters
 from ats.taleo import fill_application as fill_taleo
 from ats.successfactors import fill_application as fill_successfactors
+from ats.aps import fill_application as fill_aps
+from ats.lanl import fill_application as fill_lanl
+from ats.ornl import fill_application as fill_ornl
+from ats.slac import fill_application as fill_slac
+from ats.snl import fill_application as fill_snl
 from db.database import set_application_status
 
 HANDLERS = {
@@ -28,6 +33,11 @@ HANDLERS = {
     "workday": fill_workday,
     "icims": fill_icims,
     "jazzhr": fill_jazzhr,
+    "aps": fill_aps,
+    "lanl": fill_lanl,
+    "ornl": fill_ornl,
+    "slac": fill_slac,
+    "snl": fill_snl,
     "smartrecruiters": fill_smartrecruiters,
     "taleo": fill_taleo,
     "successfactors": fill_successfactors,
