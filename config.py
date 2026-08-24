@@ -10,7 +10,16 @@ SETTINGS_PATH = Path(__file__).parent / "dashboard" / "settings.json"
 DEFAULT_DISTANCE_SETTINGS = {
     "close_max_miles": 10, "mid_max_miles": 20, "far_max_miles": 45,
     "life_change_radius_miles": 100,
+    # 0-100. How much a job's proximity should nudge its rank in the queue,
+    # layered on top of (never replacing) the career-field relevance score
+    # that's already used for exclusion. 0 = pure field-relevance ranking,
+    # distance ignored for sorting (still used for the tier exclusion gates
+    # above); 100 = a job right next door gets the full MAX_PROXIMITY_BONUS
+    # added to its score, roughly equivalent to matching one more top-tier
+    # SECTOR_WEIGHTS keyword. See matcher/scorer.py's priority_score.
+    "distance_weight_percent": 30,
 }
+MAX_PROXIMITY_BONUS = 10  # comparable to the top SECTOR_WEIGHTS entries (quantum, particle accelerator: 10)
 
 
 def load_distance_settings() -> dict:
@@ -61,6 +70,9 @@ DISTANCE_TIERS = [
 # actual parameter Indeed/ZipRecruiter's search API takes. User-adjustable
 # from the dashboard, same mechanism as the tiers above.
 LIFE_CHANGE_SEARCH_RADIUS_MILES = _distance_settings["life_change_radius_miles"]
+
+# See DEFAULT_DISTANCE_SETTINGS above for what this controls.
+DISTANCE_WEIGHT_PERCENT = _distance_settings["distance_weight_percent"]
 
 # Search terms sent to Indeed / ZipRecruiter. Keep these as realistic job-title
 # phrases people actually search, not just field names.

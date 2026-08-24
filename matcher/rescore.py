@@ -27,15 +27,15 @@ def rescore_all() -> dict:
             )
             conn.execute(
                 """
-                UPDATE jobs SET score = ?, matched_keywords = ?, excluded = ?,
-                                 phd_flag = ?, distance_miles = ?, tier = ?,
+                UPDATE jobs SET score = ?, priority_score = ?, matched_keywords = ?,
+                                 excluded = ?, phd_flag = ?, distance_miles = ?, tier = ?,
                                  salary_annual_est = ?
                 WHERE id = ?
                 """,
                 (
-                    result["score"], json.dumps(result["matched"]), int(result["excluded"]),
-                    result["phd_flag"], result["distance_miles"], result["tier"],
-                    result["salary_annual_est"], row["id"],
+                    result["score"], result["priority_score"], json.dumps(result["matched"]),
+                    int(result["excluded"]), result["phd_flag"], result["distance_miles"],
+                    result["tier"], result["salary_annual_est"], row["id"],
                 ),
             )
             updated += 1

@@ -44,6 +44,9 @@
   }
   .dist-row .unit { font-size: 12px; color: var(--muted); width: 28px; }
   .dist-hint { font-size: 12px; color: var(--muted); margin: -4px 0 14px; }
+  .weight-row { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); }
+  .weight-labels { display: flex; justify-content: space-between; font-size: 11px;
+                    color: var(--muted); margin: -6px 0 14px 88px; }
   button.secondary {
     background: transparent; color: var(--accent); border: 1px solid var(--accent);
     border-radius: 6px; padding: 8px 14px; font-size: 13px; cursor: pointer; width: 100%;
@@ -87,6 +90,30 @@
             <span class="unit">mi</span>
           </div>
           {% endfor %}
+
+          <div class="weight-row">
+            <div class="dist-hint" style="margin-top:0;">
+              How much proximity should nudge a job's rank in the queue, on top of the
+              career-field match it already needs to clear the tiers above — 0% ranks purely by
+              field relevance, 100% gives a job right next door the same boost as matching an
+              extra top-tier keyword.
+            </div>
+            <div class="dist-row">
+              <label for="distance_weight_percent_range">Priority</label>
+              <input type="range" id="distance_weight_percent_range" min="0" max="100"
+                     value="{{ distance.distance_weight_percent }}"
+                     oninput="document.getElementById('distance_weight_percent_num').value = this.value">
+              <input type="number" name="distance_weight_percent" id="distance_weight_percent_num"
+                     min="0" max="100" value="{{ distance.distance_weight_percent }}"
+                     oninput="document.getElementById('distance_weight_percent_range').value = this.value">
+              <span class="unit">%</span>
+            </div>
+            <div class="weight-labels">
+              <span>Field relevance only</span>
+              <span>Distance matters most</span>
+            </div>
+          </div>
+
           <button class="secondary" type="submit">Save &amp; Re-score</button>
         </form>
       </div>

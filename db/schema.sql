@@ -10,7 +10,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     url TEXT,                          -- may be NULL for ZipRecruiter until authenticated resolve
     snippet TEXT,
     search_keyword TEXT,               -- which config.SEARCH_KEYWORDS term found it
-    score REAL DEFAULT 0,
+    score REAL DEFAULT 0,              -- pure career-field relevance (SECTOR_WEIGHTS match), used for the
+                                        -- per-tier/mode exclusion gates — never distance-adjusted
+    priority_score REAL DEFAULT 0,     -- score + a distance-proximity bonus (see matcher/scorer.py,
+                                        -- config.DISTANCE_WEIGHT_PERCENT) — what the queue actually sorts by
     matched_keywords TEXT,             -- JSON list of sector keywords / exclude reasons
     excluded INTEGER DEFAULT 0,        -- 1 if hard-excluded (hidden from main queue)
     phd_flag TEXT,                     -- NULL | 'excluded' | 'semi_excluded' | 'likely_excluded'
@@ -35,4 +38,8 @@ CREATE TABLE IF NOT EXISTS applications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_jobs_score ON jobs(score DESC);
+-- idx_jobs_priority_score is created in db/database.py's _migrate(), not
+-- here — on an existing (pre-priority_score) database, this script runs
+-- before _migrate() adds that column via ALTER TABLE, so creating the
+-- index on it here would fail with "no such column" on upgrade.
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);

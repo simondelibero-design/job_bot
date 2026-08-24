@@ -78,7 +78,10 @@ def save_distance_settings():
             value = int(request.form.get(key, default))
         except (TypeError, ValueError):
             value = default
-        settings[key] = max(1, value)  # no zero/negative-mile tiers
+        if key == "distance_weight_percent":
+            settings[key] = min(100, max(0, value))  # 0 = distance has no effect on ranking
+        else:
+            settings[key] = max(1, value)  # no zero/negative-mile tiers
 
     SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
 
@@ -139,7 +142,7 @@ def queue():
             if status_filter != "all":
                 query += "AND applications.status = ? "
                 params = (status_filter,)
-        query += "ORDER BY jobs.score DESC, jobs.discovered_at DESC LIMIT 200"
+        query += "ORDER BY jobs.priority_score DESC, jobs.discovered_at DESC LIMIT 200"
         rows = [dict(r) for r in conn.execute(query, params).fetchall()]
         for row in rows:
             try:

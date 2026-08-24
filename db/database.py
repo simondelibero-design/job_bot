@@ -33,10 +33,20 @@ def _migrate(conn):
     new_columns = [
         ("phd_flag", "TEXT"), ("distance_miles", "REAL"), ("tier", "TEXT"),
         ("search_mode", "TEXT DEFAULT 'local'"), ("salary_annual_est", "REAL"),
+        ("priority_score", "REAL DEFAULT 0"),
     ]
     for column, ddl_type in new_columns:
         if column not in existing:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {ddl_type}")
+    if "priority_score" not in existing:
+        # Backfill: rows from before this column existed default to 0 above,
+        # which would sort last — seed with the existing relevance score
+        # instead (equivalent to a 0%-weight blend) until the next rescore.
+        conn.execute("UPDATE jobs SET priority_score = score")
+    # Created here rather than schema.sql: on an existing (pre-priority_score)
+    # database, schema.sql's executescript runs before this migration adds
+    # the column, so an index on it there would fail with "no such column".
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_priority_score ON jobs(priority_score DESC)")
 
 
 def upsert_job(job: dict) -> int:
@@ -46,11 +56,11 @@ def upsert_job(job: dict) -> int:
         conn.execute(
             """
             INSERT INTO jobs (source, source_job_id, title, company, location, salary,
-                               job_type, url, snippet, search_keyword, score,
+                               job_type, url, snippet, search_keyword, score, priority_score,
                                matched_keywords, excluded, phd_flag, distance_miles,
                                tier, search_mode, salary_annual_est, discovered_at)
             VALUES (:source, :source_job_id, :title, :company, :location, :salary,
-                    :job_type, :url, :snippet, :search_keyword, :score,
+                    :job_type, :url, :snippet, :search_keyword, :score, :priority_score,
                     :matched_keywords, :excluded, :phd_flag, :distance_miles,
                     :tier, :search_mode, :salary_annual_est, :discovered_at)
             ON CONFLICT(source, source_job_id) DO NOTHING
@@ -67,6 +77,7 @@ def upsert_job(job: dict) -> int:
                 "snippet": job.get("snippet"),
                 "search_keyword": job.get("search_keyword"),
                 "score": job.get("score", 0),
+                "priority_score": job.get("priority_score", job.get("score", 0)),
                 "matched_keywords": json.dumps(job.get("matched_keywords", [])),
                 "excluded": int(job.get("excluded", False)),
                 "phd_flag": job.get("phd_flag"),
@@ -101,7 +112,7 @@ def top_jobs(limit: int = 50, min_score: float = 0):
             FROM jobs
             JOIN applications ON applications.job_id = jobs.id
             WHERE jobs.excluded = 0 AND jobs.score >= ?
-            ORDER BY jobs.score DESC, jobs.discovered_at DESC
+            ORDER BY jobs.priority_score DESC, jobs.discovered_at DESC
             LIMIT ?
             """,
             (min_score, limit),
