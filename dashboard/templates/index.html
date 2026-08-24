@@ -5,9 +5,9 @@
 <title>job-bot review queue</title>
 <style>
   :root {
-    --bg: #f7f7f8; --card: #ffffff; --border: #e2e2e6; --text: #1a1a1e;
-    --muted: #6b6b76; --accent: #2f6fed; --good: #1f9254; --bad: #c4432b;
-    --warn: #b9860a;
+    --bg: #16171d; --card: #1f212a; --border: #33353f; --text: #eaeaef;
+    --muted: #9a9ca8; --accent: #4d82f3; --good: #22a35f; --bad: #ff6b5c;
+    --warn: #f2b84d;
   }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
@@ -26,12 +26,12 @@
   .score { font-variant-numeric: tabular-nums; font-weight: 600; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
            font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
-  .badge.needs_review { background: #fff2d9; color: var(--warn); }
-  .badge.discovered { background: #e8eaf6; color: #3949ab; }
-  .badge.submitted { background: #e3f6ec; color: var(--good); }
-  .badge.skipped, .badge.rejected { background: #fbe6e2; color: var(--bad); }
-  .notes { font-size: 13px; margin-top: 8px; color: var(--text); background: #faf7ee;
-           border: 1px solid #eee0bb; border-radius: 6px; padding: 8px 10px; }
+  .badge.needs_review { background: #3a2f14; color: var(--warn); }
+  .badge.discovered { background: #232a4a; color: #93a5f7; }
+  .badge.submitted { background: #14301f; color: var(--good); }
+  .badge.skipped, .badge.rejected { background: #3a1f1a; color: var(--bad); }
+  .notes { font-size: 13px; margin-top: 8px; color: var(--text); background: #2a2410;
+           border: 1px solid #4a3f1f; border-radius: 6px; padding: 8px 10px; }
   .actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
   select, button, .link-btn {
     font-size: 13px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
