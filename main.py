@@ -29,8 +29,10 @@ from scrapers.fnal import search_fnal
 from scrapers.indeed import search_indeed
 from scrapers.lanl import search_lanl
 from scrapers.llnl import search_llnl
+from scrapers.ornl import search_ornl
 from scrapers.pnnl import search_pnnl
 from scrapers.slac import search_slac
+from scrapers.snl import search_snl
 from scrapers.usajobs import search_usajobs
 from scrapers.ziprecruiter import search_ziprecruiter
 
@@ -49,7 +51,7 @@ def _zip_auth_kwargs() -> dict:
     }
 
 
-VALID_SITES = {"indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal", "aps", "llnl", "lanl", "bnl", "slac"}
+VALID_SITES = {"indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal", "aps", "llnl", "lanl", "bnl", "slac", "ornl", "snl"}
 
 
 def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
@@ -141,6 +143,20 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_slac(keyword)
             except Exception as e:
                 print(f"  slac search failed for '{keyword}': {e}")
+
+        if "ornl" in sites:
+            print(f"[{mode}][ornl] searching: {keyword}")
+            try:
+                found_this_keyword += search_ornl(keyword)
+            except Exception as e:
+                print(f"  ornl search failed for '{keyword}': {e}")
+
+        if "snl" in sites:
+            print(f"[{mode}][snl] searching: {keyword}")
+            try:
+                found_this_keyword += search_snl(keyword, headless=headless)
+            except Exception as e:
+                print(f"  snl search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(
