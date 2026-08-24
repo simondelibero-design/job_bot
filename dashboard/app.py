@@ -75,13 +75,13 @@ def save_distance_settings():
     settings = {}
     for key, default in DEFAULT_DISTANCE_SETTINGS.items():
         try:
-            value = int(request.form.get(key, default))
+            value = float(request.form.get(key, default))
         except (TypeError, ValueError):
             value = default
         if key == "distance_weight_percent":
-            settings[key] = min(100, max(0, value))  # 0 = distance has no effect on ranking
+            settings[key] = min(100.0, max(0.0, value))  # 0 = distance has no effect on ranking
         else:
-            settings[key] = max(1, value)  # no zero/negative-mile tiers
+            settings[key] = max(0.1, value)  # no zero/negative-mile tiers
 
     SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
 
