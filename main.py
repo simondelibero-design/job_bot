@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent))
 
-from config import LOCATION, SEARCH_KEYWORDS
+from config import LIFE_CHANGE_SEARCH_RADIUS_MILES, LOCATION, SEARCH_KEYWORDS
 from db.database import init_db, upsert_job, top_jobs
 from matcher.scorer import score_job
 from scrapers.anl import search_anl
@@ -196,7 +196,7 @@ def run_life_change_discovery(keywords=None, headless: bool = True, sites: list[
     """Nationwide relocation-open sweep, filtered on relevance + pay."""
     init_db()
     keywords = keywords or SEARCH_KEYWORDS
-    total = _run_sweep(keywords, "United States", 100, "life_change", headless, sites)
+    total = _run_sweep(keywords, "United States", LIFE_CHANGE_SEARCH_RADIUS_MILES, "life_change", headless, sites)
     print(f"\n[life_change] Done. {total} listings processed this run.")
 
 

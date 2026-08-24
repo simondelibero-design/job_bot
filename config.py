@@ -1,10 +1,44 @@
 """Search scope and priority configuration. Edit freely as your targets change."""
+import json
+from pathlib import Path
+
+# User-adjustable distance/radius knobs, editable from the dashboard home
+# page (under "Database") without touching this file. Falls back to the
+# defaults below if the file doesn't exist yet or is malformed — never lets
+# a bad settings file crash the whole config import.
+SETTINGS_PATH = Path(__file__).parent / "dashboard" / "settings.json"
+DEFAULT_DISTANCE_SETTINGS = {
+    "close_max_miles": 10, "mid_max_miles": 20, "far_max_miles": 45,
+    "life_change_radius_miles": 100,
+}
+
+
+def load_distance_settings() -> dict:
+    """Public so dashboard/app.py can read the live values straight off disk
+    (rather than trusting this module's own import-time snapshot, which goes
+    stale the moment settings.json changes without a process restart) and
+    so it can reuse the same defaults/validation when saving a new value."""
+    settings = dict(DEFAULT_DISTANCE_SETTINGS)
+    try:
+        saved = json.loads(SETTINGS_PATH.read_text())
+        for key in DEFAULT_DISTANCE_SETTINGS:
+            if key in saved:
+                settings[key] = saved[key]
+    except (OSError, json.JSONDecodeError, ValueError):
+        pass  # no file yet, or it's corrupt — just use the defaults
+    return settings
+
+
+_distance_settings = load_distance_settings()
 
 LOCATION = {
     "city": "Milton",
     "state": "WA",
     "query": "1410 10th Ave, Milton, WA 98354",
-    "radius_miles": 45,
+    # Search radius for the "local" mode sweep — kept equal to the "far"
+    # tier's outer limit below, since searching further than the widest
+    # tier that will ever accept a result is pointless.
+    "radius_miles": _distance_settings["far_max_miles"],
 }
 
 # Distance-tiered relevance filtering: close jobs are cheap to consider, so
@@ -13,11 +47,20 @@ LOCATION = {
 # max_miles covers the job's distance wins. Jobs whose location we can't
 # resolve to a distance (see matcher/distance.py) default to the last tier
 # ("far") — the strictest — rather than being treated as conveniently close.
+# max_miles values are user-adjustable (see load_distance_settings above);
+# min_score thresholds are not exposed in the UI, only the mile boundaries.
 DISTANCE_TIERS = [
-    {"name": "close", "max_miles": 10, "min_score": 0},   # accept everything
-    {"name": "mid", "max_miles": 20, "min_score": 1},     # light filter — almost any match counts
-    {"name": "far", "max_miles": 45, "min_score": 3},     # full field-relevance filter
+    {"name": "close", "max_miles": _distance_settings["close_max_miles"], "min_score": 0},
+    {"name": "mid", "max_miles": _distance_settings["mid_max_miles"], "min_score": 1},
+    {"name": "far", "max_miles": _distance_settings["far_max_miles"], "min_score": 3},
 ]
+
+# Search radius (miles) used for the life_change mode's nationwide sweep —
+# searches around the literal string "United States" as the location, so
+# this barely constrains anything geographically in practice, but it's the
+# actual parameter Indeed/ZipRecruiter's search API takes. User-adjustable
+# from the dashboard, same mechanism as the tiers above.
+LIFE_CHANGE_SEARCH_RADIUS_MILES = _distance_settings["life_change_radius_miles"]
 
 # Search terms sent to Indeed / ZipRecruiter. Keep these as realistic job-title
 # phrases people actually search, not just field names.

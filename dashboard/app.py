@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Flask, redirect, render_template, request, url_for
 
 sys.path.append(str(Path(__file__).parent.parent))
+from config import DEFAULT_DISTANCE_SETTINGS, SETTINGS_PATH, load_distance_settings  # noqa: E402
 from db.database import get_conn, restore_job, set_application_status  # noqa: E402
 
 ROOT = Path(__file__).parent.parent
@@ -65,7 +66,31 @@ def home():
         sites=VALID_SITES,
         modes=VALID_MODES,
         sweep=sweep_status(),
+        distance=load_distance_settings(),
     )
+
+
+@app.route("/settings/distance", methods=["POST"])
+def save_distance_settings():
+    settings = {}
+    for key, default in DEFAULT_DISTANCE_SETTINGS.items():
+        try:
+            value = int(request.form.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        settings[key] = max(1, value)  # no zero/negative-mile tiers
+
+    SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
+
+    # Existing DB rows were scored under the old tiers/radius and won't
+    # reflect this change on their own (upsert_job does ON CONFLICT DO
+    # NOTHING) — rescore now so the queue reflects the new settings
+    # immediately instead of only affecting jobs discovered from here on.
+    subprocess.Popen(
+        [sys.executable, str(ROOT / "matcher" / "rescore.py")],
+        cwd=str(ROOT),
+    )
+    return redirect(url_for("home"))
 
 
 @app.route("/run-sweep", methods=["POST"])

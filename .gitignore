@@ -19,3 +19,7 @@ db/jobs.db
 
 # Home page's sweep-in-progress tracker — ephemeral runtime state
 dashboard/.sweep_lock.json
+
+# User-adjustable distance/radius settings (close/mid/far tiers, life_change
+# search radius) — local machine preference, not project source
+dashboard/settings.json
