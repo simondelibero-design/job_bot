@@ -26,6 +26,8 @@ from scrapers.anl import search_anl
 from scrapers.aps import search_aps
 from scrapers.fnal import search_fnal
 from scrapers.indeed import search_indeed
+from scrapers.lanl import search_lanl
+from scrapers.llnl import search_llnl
 from scrapers.pnnl import search_pnnl
 from scrapers.usajobs import search_usajobs
 from scrapers.ziprecruiter import search_ziprecruiter
@@ -45,7 +47,7 @@ def _zip_auth_kwargs() -> dict:
     }
 
 
-VALID_SITES = {"indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal", "aps"}
+VALID_SITES = {"indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal", "aps", "llnl", "lanl"}
 
 
 def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
@@ -109,6 +111,20 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_aps(keyword)
             except Exception as e:
                 print(f"  aps search failed for '{keyword}': {e}")
+
+        if "llnl" in sites:
+            print(f"[{mode}][llnl] searching: {keyword}")
+            try:
+                found_this_keyword += search_llnl(keyword)
+            except Exception as e:
+                print(f"  llnl search failed for '{keyword}': {e}")
+
+        if "lanl" in sites:
+            print(f"[{mode}][lanl] searching: {keyword}")
+            try:
+                found_this_keyword += search_lanl(keyword)
+            except Exception as e:
+                print(f"  lanl search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(
