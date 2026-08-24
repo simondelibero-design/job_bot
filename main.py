@@ -22,6 +22,8 @@ sys.path.append(str(Path(__file__).parent))
 from config import LOCATION, SEARCH_KEYWORDS
 from db.database import init_db, upsert_job, top_jobs
 from matcher.scorer import score_job
+from scrapers.anl import search_anl
+from scrapers.fnal import search_fnal
 from scrapers.indeed import search_indeed
 from scrapers.pnnl import search_pnnl
 from scrapers.usajobs import search_usajobs
@@ -42,7 +44,7 @@ def _zip_auth_kwargs() -> dict:
     }
 
 
-VALID_SITES = {"indeed", "ziprecruiter", "usajobs", "pnnl"}
+VALID_SITES = {"indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal"}
 
 
 def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
@@ -85,6 +87,20 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_pnnl(keyword)
             except Exception as e:
                 print(f"  pnnl search failed for '{keyword}': {e}")
+
+        if "anl" in sites:
+            print(f"[{mode}][anl] searching: {keyword}")
+            try:
+                found_this_keyword += search_anl(keyword)
+            except Exception as e:
+                print(f"  anl search failed for '{keyword}': {e}")
+
+        if "fnal" in sites:
+            print(f"[{mode}][fnal] searching: {keyword}")
+            try:
+                found_this_keyword += search_fnal(keyword)
+            except Exception as e:
+                print(f"  fnal search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(
