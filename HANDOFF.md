@@ -1,16 +1,16 @@
 # job-bot — Handoff
 
 Originally rewritten 2026-08-21 after a prior chat session hit three `[bio]`
-platform blocks and recommended starting fresh. That new session picked
-this up cleanly and made real progress the same day — see "Session 2" below
-for what changed. This document exists so any session (or a different AI
-instance) can pick up cleanly with zero context loss.
+platform blocks and recommended starting fresh. A follow-up session on
+2026-08-24 picked this up cleanly and made real progress — see "Session 2"
+below for what changed. This document exists so any session (or a
+different AI instance) can pick up cleanly with zero context loss.
 
 **Nothing about the actual project is broken.** Every number below was
 verified against real state right before writing this — check yourself
 before trusting anything that reads as stale.
 
-## Session 2 (2026-08-21, same day): ATS platform research resolved
+## Session 2 (2026-08-24): ATS platform research resolved, PNNL added
 
 Picked up item 2 and item 3 from the to-do list below. Live-inspected six
 ATS platforms against real, current job postings (not documentation) to
@@ -60,7 +60,12 @@ settle exactly which ones are automatable:
   way, verified live ("Career Opportunities: Sign In" / "Create an account
   to apply"). `ats/successfactors.py` detects this and hands off.
 
-All six are wired into `ats/detect.py` (`PLATFORM_PATTERNS`) and
+Same session also picked up item 4 (National Labs) and added PNNL as a
+real discovery source — see that item under "Explicitly requested, not yet
+built" below for the details (it has its own real public JSON API, no
+scraping needed).
+
+All six ATS platforms are wired into `ats/detect.py` (`PLATFORM_PATTERNS`) and
 `ats/apply.py` (`HANDLERS`) — 8 platforms total now recognized, up from 4.
 Every handler still follows the unbroken project rule: fill what's safely
 fillable, never touch consent checkboxes or CAPTCHAs, never create
@@ -96,26 +101,31 @@ Location: `~/Desktop/job-bot/`. **Pushed to a private GitHub repo**:
 https://github.com/simondelibero-design/job_bot (see Git section below —
 this is fully working now, don't redo the setup).
 
-## Current real state (verified 2026-08-21, last commit `03048ca`)
+## Current real state (verified 2026-08-24, commit `4ff4689`)
 
-- **3,116 jobs** in `db/jobs.db`: 1,554 local, 1,057 remote, 505 life_change.
-  Full 99-keyword sweep across all three modes and both Indeed+ZipRecruiter
-  is done — not a partial/test run.
+- **3,141 jobs** in `db/jobs.db`: 1,554 local, 1,082 remote, 505 life_change.
+  The 1,057→1,082 remote bump is real PNNL postings from smoke-testing the
+  new `scrapers/pnnl.py` end-to-end (2-keyword test, not a full sweep) —
+  everything else is the original full 99-keyword Indeed+ZipRecruiter sweep
+  from 2026-08-21, not a partial/test run.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
   `cd ~/Desktop/job-bot && source venv/bin/activate && python dashboard/app.py`
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
   sweep, see live status) and **`/queue`** (the actual job review list with
   all the status/PhD tabs).
-- **USAJobs.gov integration just built, NOT yet live-tested** — no API key
-  was available while writing it. Needs: register free at
-  https://developer.usajobs.gov/ (self-service, email-based — the user needs
-  to do this himself, same as every other credential in this project), save
-  `{"api_key": "...", "user_agent": "his-registered-email"}` to
-  `scrapers/usajobs_credentials.json` (already gitignored). Then run
-  `python scrapers/usajobs.py` standalone to sanity-check a live response
-  before trusting it in a real sweep — the field-name assumptions
-  (`PositionTitle`, `PositionRemuneration`, etc.) came from documentation,
-  not a live response.
+- **USAJobs.gov integration built, still NOT live-tested** — no API key has
+  been saved yet. `scrapers/save_usajobs_key.py` exists (untracked helper,
+  found sitting in the repo 2026-08-24 — unclear which session added it)
+  that prompts for the key interactively and writes
+  `scrapers/usajobs_credentials.json` (gitignored) locally, never sending
+  it anywhere else. User needs to: register free at
+  https://developer.usajobs.gov/ (self-service, email-based), then run
+  `python scrapers/save_usajobs_key.py` himself — same credential boundary
+  as everywhere else in this project. Then run `python scrapers/usajobs.py`
+  standalone to sanity-check a live response before trusting it in a real
+  sweep — the field-name assumptions (`PositionTitle`,
+  `PositionRemuneration`, etc.) still come from documentation, not a live
+  response.
 
 ## Git / GitHub (fully working, don't redo this)
 
@@ -148,9 +158,14 @@ this is fully working now, don't redo the setup).
     do not attempt to bypass/spoof Cloudflare.
   - `scrapers/usajobs.py` — see "Current real state" above, needs live
     verification.
+  - `scrapers/pnnl.py` — **real, live-tested, working** (2026-08-24). Public
+    JSON API (`careers.pnnl.gov/api/jobs`), no browser automation. Ignores
+    `location`/`radius_miles` (single-employer board, not a general
+    search) — accepts them only for interface parity with the other
+    `search_*` functions.
   - `main.py`'s `_run_sweep()` takes a `sites` list (`indeed`,
-    `ziprecruiter`, `usajobs`) so any subset can be searched — this is what
-    the home page's checkboxes control.
+    `ziprecruiter`, `usajobs`, `pnnl`) so any subset can be searched — this
+    is what the home page's checkboxes control.
 - **Scoring** (`matcher/scorer.py`, `config.py`):
   - `SEARCH_KEYWORDS` / `SECTOR_WEIGHTS` — the "specialization" list (grown
     across multiple rounds: core physics/engineering/chem/materials/CS/math,
@@ -246,12 +261,22 @@ this list exists as a clean starting point):
    required). See "Session 2" above.
 4. **National Labs section** — DOE national labs (Livermore, Los Alamos,
    Oak Ridge, PNNL, Sandia, Argonne, Fermilab, Brookhaven, SLAC, etc.).
-   Worth noting: **PNNL (Pacific Northwest National Laboratory) is
-   literally in WA state**, unusually relevant given the user's location —
-   a good first target. Not started. These labs are often
-   contractor-operated (not direct federal employees), so USAJobs likely
-   won't cover most of them — will need their own career-site scrapers,
-   inspected live the same way Indeed/ZipRecruiter/Greenhouse/Lever were.
+   **PNNL done, same Session 2**: `scrapers/pnnl.py` built and
+   live-tested end-to-end through `main.py`'s real `_run_sweep()` — found,
+   scored, and logged 25 real jobs to the DB on a two-keyword test. Turned
+   out PNNL has a genuine public JSON API behind careers.pnnl.gov
+   (`/api/jobs`, found via live network inspection, not documentation) —
+   no browser automation needed, same tier as USAJobs.gov. Every posting's
+   `apply_url` points to `careers-pnnl.icims.com`, so `ats/icims.py`
+   already covers the application side once these reach that stage. Wired
+   into `main.py` (`VALID_SITES`, `_run_sweep`) and the dashboard home page
+   (`dashboard/app.py`'s `VALID_SITES` — the template renders checkboxes
+   dynamically, so no template edit was needed).
+   The other labs (Livermore, Los Alamos, Oak Ridge, Sandia, Argonne,
+   Fermilab, Brookhaven, SLAC) are still untouched — worth checking each
+   for a similar JSON API before assuming HTML scraping is needed; several
+   are also contractor-operated the same way PNNL is (Battelle), so
+   USAJobs.gov likely won't cover them either.
 5. **NSF (National Science Foundation) section** — NSF is a federal agency,
    so its own direct positions likely already get covered by USAJobs once
    that's live-tested; the user wants an explicit section anyway, worth

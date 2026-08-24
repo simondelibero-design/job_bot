@@ -23,6 +23,7 @@ from config import LOCATION, SEARCH_KEYWORDS
 from db.database import init_db, upsert_job, top_jobs
 from matcher.scorer import score_job
 from scrapers.indeed import search_indeed
+from scrapers.pnnl import search_pnnl
 from scrapers.usajobs import search_usajobs
 from scrapers.ziprecruiter import search_ziprecruiter
 
@@ -41,7 +42,7 @@ def _zip_auth_kwargs() -> dict:
     }
 
 
-VALID_SITES = {"indeed", "ziprecruiter", "usajobs"}
+VALID_SITES = {"indeed", "ziprecruiter", "usajobs", "pnnl"}
 
 
 def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
@@ -77,6 +78,13 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_usajobs(keyword, location_query, radius)
             except Exception as e:
                 print(f"  usajobs search failed for '{keyword}': {e}")
+
+        if "pnnl" in sites:
+            print(f"[{mode}][pnnl] searching: {keyword}")
+            try:
+                found_this_keyword += search_pnnl(keyword)
+            except Exception as e:
+                print(f"  pnnl search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(
