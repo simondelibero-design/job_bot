@@ -85,6 +85,65 @@ is the substance of what they do. Still worth a real dashboard "Prepare &
 Open" click against a live queued job at some point, but the core logic
 has been exercised.
 
+### Session 2, continued: ATS in-fill for the new labs, scoring tweaks, dark mode
+
+User asked to (1) build ATS auto-fill for the newly added national-lab/APS
+discovery sources, (2) route seniority-signaling titles into the existing
+`likely_excluded` review tab, (3) confirm search/filter matching is
+case-insensitive, and (4) dark-mode the dashboard. Also verified live
+end-to-end that the batch-prepare feature actually works — including
+accidentally killing and having to restart the user's long-running
+dashboard server mid-testing (a process-management mistake, not a code
+bug — see git history for exact recovery steps if this happens again).
+
+- **5 new ATS handlers** (`ats/aps.py`, `ats/lanl.py`, `ats/ornl.py`,
+  `ats/slac.py`, `ats/snl.py`) — live-inspected each platform's actual
+  apply flow (not assumed from the discovery scraper's domain). `aps.py`
+  is genuinely fillable (no gate); `slac.py` partial-fills email behind a
+  lighter iframe-based gate (with a honeypot field deliberately left
+  untouched); `lanl.py`/`ornl.py`/`snl.py` are honest gate-detectors
+  (LANL: a bot wall, not an account gate; ORNL: SuccessFactors-style
+  sign-in on a hostname the existing pattern didn't match; SNL: account
+  gate *and* no stable per-posting URL at all). 13 ATS platforms
+  recognized now, up from 8. Two real bugs found and fixed while verifying
+  live: an iframe-context miss in `slac.py`, a mid-navigation race in
+  `ornl.py`.
+- **`ats/aps.py`'s covering-message field** is pre-filled with a fixed,
+  user-specified line (`COVERING_MESSAGE` in that file) rather than left
+  blank — still surfaced in `needs_review` for a look before submitting.
+- **Seniority filter**: `config.py`'s new `SENIORITY_EXCLUDE_KEYWORDS`
+  (`head`, `lead`, `senior`, `sr`, `chief`) routes matching titles into
+  `phd_flag="likely_excluded"` — the same tab/mechanism as a bare PhD
+  mention, matched whole-word and case-insensitive via a new
+  `_SENIORITY_RE` in `matcher/scorer.py`, checked only if the job wasn't
+  already PhD-flagged. **Known false-positive risk, flagged in the
+  config.py comment, not silently ignored**: "lead" also means the metal
+  (lead-free, lead paint testing — plausible in materials/environmental
+  postings) and "sr" collides with unrelated abbreviations (SR-71, State
+  Route — plausible in aerospace/defense postings). Ran
+  `matcher/rescore.py` after adding this — 690 already-logged jobs got
+  newly flagged into `likely_excluded` this way (verified via a DB query
+  on `matched_keywords`, not just trusted from the rescore summary line,
+  which conflates this with every other pre-existing exclusion reason).
+  All still visible/restorable, nothing deleted.
+- **Case-insensitivity**: audited, already fully in place before this
+  session — `matcher/scorer.py` lowercases both the searched text and
+  every keyword before comparing, and the PhD-mention regex already had
+  `re.I`. No code changes were needed for this one, just verification.
+- **Dark mode**: dispatched as a background agent (dashboard/templates/
+  home.html + index.html) since it's self-contained CSS work — check
+  HANDOFF.md's git log or ask the user whether it landed if this note is
+  still here unedited.
+- **Dashboard queue page got real new UI this session** (not yet reflected
+  further down in this doc's "What's built" section): a sticky batch bar
+  with select-all + "Prepare & Open Selected" (opens several pre-filled
+  browser windows in one action instead of one at a time), per-card
+  checkboxes, and keyboard shortcuts (`j`/`k` move focus, `x` select,
+  `o`/`p`/`m`/`s`/`r` for open/prepare/mark-submitted/skip/reject). Live
+  browser-tested, including a real end-to-end batch-prepare run against a
+  live SLAC posting that confirmed the whole pipeline (dashboard → 
+  `ats/apply.py` → `ats/slac.py` → DB update) works correctly together.
+
 ## What this project is
 
 An automated job-search pipeline for Simon DeLibero (Applied Physics B.S.

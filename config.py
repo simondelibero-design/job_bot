@@ -210,6 +210,19 @@ PHD_PREFERRED_KEYWORDS = [
     "phd desired", "doctorate preferred", "preferably phd", "phd strongly preferred",
 ]
 
+# Seniority-level filtering: routed into the same "likely_excluded" tab as a
+# bare PhD mention (not because these imply a PhD — just reusing the same
+# low-priority "flagged but still visible, one-click Restore" bucket instead
+# of building a separate one). Matched whole-word, case-insensitive, only
+# checked if the job wasn't already PhD-flagged above.
+# Real false-positive risk on two of these, given this user's fields: "lead"
+# also means the metal (lead-free, lead paint testing, lead time — plausible
+# in materials/environmental postings), and "sr" collides with unrelated
+# abbreviations (SR-71, State Route — plausible in aerospace/defense
+# postings). Watch the likely_excluded tab and Restore anything caught by
+# mistake rather than assuming the filter is always right.
+SENIORITY_EXCLUDE_KEYWORDS = ["head", "lead", "senior", "sr", "chief"]
+
 MIN_SCORE_TO_QUEUE = 3  # kept for the "far" distance tier's threshold
 
 # Remote sweep: no natural distance cap since it's not geography-limited, so

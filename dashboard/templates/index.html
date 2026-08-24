@@ -41,6 +41,16 @@
   button.good { background: var(--good); color: white; border-color: var(--good); }
   button.bad { background: transparent; color: var(--bad); border-color: var(--bad); }
   .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .batch-bar { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+               padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center;
+               gap: 10px; flex-wrap: wrap; font-size: 13px; position: sticky; top: 12px; z-index: 5; }
+  .batch-bar label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .batch-bar .hint { color: var(--muted); margin-left: auto; }
+  .batch-bar kbd { background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+                    padding: 1px 5px; font-family: inherit; font-size: 11px; }
+  .card { position: relative; }
+  .card.focused { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .select-job { margin-right: 4px; }
 </style>
 </head>
 <body>
@@ -56,15 +66,37 @@
     {% endfor %}
   </div>
 
+  {% if jobs and status_filter not in phd_tabs %}
+  <form id="batch-form" class="batch-bar" method="post" action="{{ url_for('prepare_batch') }}">
+    <label><input type="checkbox" id="select-all"> Select all</label>
+    <span id="selected-count">0 selected</span>
+    <select name="resume" form="batch-form">
+      {% for r in resumes %}
+        <option value="{{ r }}" {% if r == default_resume %}selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+    <button class="primary" type="submit" id="batch-submit" disabled>Prepare &amp; Open Selected</button>
+    <span class="hint">
+      <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>x</kbd> select · <kbd>o</kbd> open · <kbd>p</kbd> prepare ·
+      <kbd>m</kbd> submitted · <kbd>s</kbd> skip · <kbd>r</kbd> reject
+    </span>
+  </form>
+  {% endif %}
+
   {% if not jobs %}
     <div class="card empty">No jobs in this view.</div>
   {% endif %}
 
   {% for job in jobs %}
-    <div class="card">
+    <div class="card" data-job-id="{{ job.id }}">
       <div class="row-top">
         <div>
-          <div class="title">{{ job.title }}</div>
+          <div class="title">
+            {% if status_filter not in phd_tabs and job.url %}
+              <input type="checkbox" class="select-job" name="job_ids" value="{{ job.id }}" form="batch-form">
+            {% endif %}
+            {{ job.title }}
+          </div>
           <div class="company">{{ job.company or 'Unknown company' }} — {{ job.location or 'location n/a' }}</div>
         </div>
         <div>
@@ -93,8 +125,8 @@
             <button class="good" type="submit">Restore</button>
           </form>
         {% elif job.url %}
-          <a class="link-btn" href="{{ job.url }}" target="_blank" rel="noopener">Open posting</a>
-          <form method="post" action="{{ url_for('prepare', job_id=job.id) }}" style="display:flex; gap:6px;">
+          <a class="link-btn js-open" href="{{ job.url }}" target="_blank" rel="noopener">Open posting</a>
+          <form class="js-prepare" method="post" action="{{ url_for('prepare', job_id=job.id) }}" style="display:flex; gap:6px;">
             <select name="resume">
               {% for r in resumes %}
                 <option value="{{ r }}" {% if r == default_resume %}selected{% endif %}>{{ r }}</option>
@@ -107,20 +139,20 @@
         {% endif %}
 
         {% if status_filter not in phd_tabs %}
-        <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+        <form class="js-mark_submitted" method="post" action="{{ url_for('action', job_id=job.id) }}">
           <input type="hidden" name="action" value="mark_submitted">
           <button class="good" type="submit">Mark Submitted</button>
         </form>
-        <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+        <form class="js-skip" method="post" action="{{ url_for('action', job_id=job.id) }}">
           <input type="hidden" name="action" value="skip">
           <button type="submit">Skip</button>
         </form>
-        <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+        <form class="js-reject" method="post" action="{{ url_for('action', job_id=job.id) }}">
           <input type="hidden" name="action" value="reject">
           <button class="bad" type="submit">Reject</button>
         </form>
         {% if job.app_status != 'needs_review' %}
-        <form method="post" action="{{ url_for('action', job_id=job.id) }}">
+        <form class="js-requeue" method="post" action="{{ url_for('action', job_id=job.id) }}">
           <input type="hidden" name="action" value="requeue">
           <button type="submit">Requeue</button>
         </form>
@@ -129,5 +161,93 @@
       </div>
     </div>
   {% endfor %}
+
+<script>
+(function() {
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.card[data-job-id]'));
+  var focusedIndex = -1;
+
+  function setFocus(i) {
+    if (cards.length === 0) return;
+    i = Math.max(0, Math.min(cards.length - 1, i));
+    if (focusedIndex >= 0) cards[focusedIndex].classList.remove('focused');
+    focusedIndex = i;
+    cards[focusedIndex].classList.add('focused');
+    cards[focusedIndex].scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  function submitIn(card, cls) {
+    var form = card.querySelector('.' + cls);
+    if (form) form.requestSubmit ? form.requestSubmit() : form.submit();
+  }
+
+  document.addEventListener('keydown', function(e) {
+    // Don't hijack typing in the resume <select> or anywhere else with focus.
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'select' || tag === 'input' || tag === 'textarea') return;
+    if (cards.length === 0) return;
+
+    switch (e.key) {
+      case 'j': case 'ArrowDown':
+        e.preventDefault(); setFocus(focusedIndex + 1); break;
+      case 'k': case 'ArrowUp':
+        e.preventDefault(); setFocus(focusedIndex - 1); break;
+      case 'x': {
+        if (focusedIndex < 0) break;
+        var cb = cards[focusedIndex].querySelector('.select-job');
+        if (cb) { cb.checked = !cb.checked; updateSelectedCount(); }
+        break;
+      }
+      case 'o':
+        if (focusedIndex < 0) break;
+        var link = cards[focusedIndex].querySelector('.js-open');
+        if (link) window.open(link.href, '_blank');
+        break;
+      case 'p':
+        if (focusedIndex < 0) break;
+        submitIn(cards[focusedIndex], 'js-prepare');
+        break;
+      case 'm':
+        if (focusedIndex < 0) break;
+        submitIn(cards[focusedIndex], 'js-mark_submitted');
+        break;
+      case 's':
+        if (focusedIndex < 0) break;
+        submitIn(cards[focusedIndex], 'js-skip');
+        break;
+      case 'r':
+        if (focusedIndex < 0) break;
+        submitIn(cards[focusedIndex], 'js-reject');
+        break;
+    }
+  });
+
+  if (cards.length > 0) setFocus(0);
+
+  // Batch selection bar
+  var selectAll = document.getElementById('select-all');
+  var batchSubmit = document.getElementById('batch-submit');
+  var selectedCount = document.getElementById('selected-count');
+  var jobCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.select-job'));
+
+  window.updateSelectedCount = function() {
+    var n = jobCheckboxes.filter(function(cb) { return cb.checked; }).length;
+    if (selectedCount) selectedCount.textContent = n + ' selected';
+    if (batchSubmit) batchSubmit.disabled = n === 0;
+    if (selectAll) selectAll.checked = n > 0 && n === jobCheckboxes.length;
+  };
+
+  jobCheckboxes.forEach(function(cb) {
+    cb.addEventListener('change', updateSelectedCount);
+  });
+  if (selectAll) {
+    selectAll.addEventListener('change', function() {
+      jobCheckboxes.forEach(function(cb) { cb.checked = selectAll.checked; });
+      updateSelectedCount();
+    });
+  }
+  updateSelectedCount();
+})();
+</script>
 </body>
 </html>

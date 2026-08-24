@@ -6,6 +6,7 @@ opened browser window.
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from flask import Flask, redirect, render_template, request, url_for
@@ -132,9 +133,11 @@ def queue():
     )
 
 
-@app.route("/job/<int:job_id>/prepare", methods=["POST"])
-def prepare(job_id):
-    resume_stem = request.form.get("resume", DEFAULT_RESUME)
+def _launch_prepare(job_id: int, resume_stem: str) -> bool:
+    """Launches ats/apply.py as a detached subprocess for one job — a real,
+    visible browser window opens independently and stays open until the
+    user closes it. Returns False (and marks the job needs_review with a
+    note) if there's no URL to open at all."""
     resume_path = RESUME_DIR / f"{resume_stem}.md"
 
     with get_conn() as conn:
@@ -142,14 +145,38 @@ def prepare(job_id):
 
     if not row or not row["url"]:
         set_application_status(job_id, "needs_review", notes="No URL on file — find/apply manually")
-        return redirect(request.referrer or url_for("queue"))
+        return False
 
-    # Detached: the dashboard request returns immediately, the browser
-    # window stays open independently until the user closes it.
     subprocess.Popen(
         [sys.executable, str(ROOT / "ats" / "apply.py"), str(job_id), row["url"], str(resume_path)],
         cwd=str(ROOT),
     )
+    return True
+
+
+@app.route("/job/<int:job_id>/prepare", methods=["POST"])
+def prepare(job_id):
+    resume_stem = request.form.get("resume", DEFAULT_RESUME)
+    _launch_prepare(job_id, resume_stem)
+    return redirect(request.referrer or url_for("queue"))
+
+
+@app.route("/queue/prepare-batch", methods=["POST"])
+def prepare_batch():
+    """Opens several pre-filled browser windows at once instead of one at a
+    time — the review step (a human looking at each and clicking submit)
+    still happens one window at a time, but you don't have to come back to
+    the dashboard and click again between every single one."""
+    resume_stem = request.form.get("resume", DEFAULT_RESUME)
+    job_ids = [int(j) for j in request.form.getlist("job_ids")]
+
+    # Stagger launches slightly — opening a dozen real Chromium windows in
+    # the exact same instant is unnecessarily heavy; a beat between each
+    # keeps it responsive without meaningfully slowing the batch down.
+    for job_id in job_ids:
+        _launch_prepare(job_id, resume_stem)
+        time.sleep(0.4)
+
     return redirect(request.referrer or url_for("queue"))
 
 

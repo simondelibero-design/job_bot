@@ -7,11 +7,15 @@ sys.path.append(str(Path(__file__).parent.parent))
 from config import (
     DISTANCE_TIERS, EXCLUDE_KEYWORDS, LIFE_CHANGE_MIN_SALARY, LIFE_CHANGE_MIN_SCORE,
     PHD_PREFERRED_KEYWORDS, PHD_REQUIRED_KEYWORDS, REMOTE_MIN_SCORE, SECTOR_WEIGHTS,
+    SENIORITY_EXCLUDE_KEYWORDS,
 )
 from matcher.distance import estimate_distance_miles
 from matcher.salary import parse_salary_annual
 
 _PHD_MENTION_RE = re.compile(r"\bph\.?\s?d\.?\b", re.I)
+_SENIORITY_RE = re.compile(
+    r"\b(" + "|".join(re.escape(t) for t in SENIORITY_EXCLUDE_KEYWORDS) + r")\b", re.I
+)
 
 
 def classify_distance(location: str | None) -> tuple[float | None, str]:
@@ -60,6 +64,13 @@ def _phd_and_sector_pass(text: str) -> dict | None:
             phd_flag = "likely_excluded"
             start, end = max(m.start() - 20, 0), min(m.end() + 20, len(text))
             phd_reason = f"mentions PhD: \"...{text[start:end].strip()}...\""
+
+    if phd_flag is None:
+        m = _SENIORITY_RE.search(text)
+        if m:
+            phd_flag = "likely_excluded"
+            start, end = max(m.start() - 20, 0), min(m.end() + 20, len(text))
+            phd_reason = f"seniority term: \"...{text[start:end].strip()}...\""
 
     score = 0.0
     matched = []
