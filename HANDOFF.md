@@ -101,13 +101,16 @@ Location: `~/Desktop/job-bot/`. **Pushed to a private GitHub repo**:
 https://github.com/simondelibero-design/job_bot (see Git section below —
 this is fully working now, don't redo the setup).
 
-## Current real state (verified 2026-08-24, commit `4ff4689`)
+## Current real state (verified 2026-08-24, commit `de3eca9`)
 
-- **3,141 jobs** in `db/jobs.db`: 1,554 local, 1,082 remote, 505 life_change.
-  The 1,057→1,082 remote bump is real PNNL postings from smoke-testing the
-  new `scrapers/pnnl.py` end-to-end (2-keyword test, not a full sweep) —
-  everything else is the original full 99-keyword Indeed+ZipRecruiter sweep
-  from 2026-08-21, not a partial/test run.
+- **3,258 jobs** in `db/jobs.db`: 1,554 local, 1,199 remote, 505 life_change.
+  The 1,057→1,199 remote bump is real postings from smoke-testing each new
+  national-lab/APS scraper end-to-end (1-2 keyword tests each, not full
+  sweeps) — everything else is the original full 99-keyword Indeed+
+  ZipRecruiter sweep from 2026-08-21, not a partial/test run. A real full
+  sweep with all sources enabled hasn't been run yet — worth doing once
+  ORNL/SNL land too, to get proper multi-keyword coverage from all the new
+  sources rather than just the 1-2 keywords each got smoke-tested with.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
   `cd ~/Desktop/job-bot && source venv/bin/activate && python dashboard/app.py`
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
@@ -158,14 +161,20 @@ this is fully working now, don't redo the setup).
     do not attempt to bypass/spoof Cloudflare.
   - `scrapers/usajobs.py` — see "Current real state" above, needs live
     verification.
-  - `scrapers/pnnl.py` — **real, live-tested, working** (2026-08-24). Public
-    JSON API (`careers.pnnl.gov/api/jobs`), no browser automation. Ignores
-    `location`/`radius_miles` (single-employer board, not a general
-    search) — accepts them only for interface parity with the other
-    `search_*` functions.
+  - `scrapers/pnnl.py`, `scrapers/anl.py`, `scrapers/fnal.py`,
+    `scrapers/bnl.py`, `scrapers/llnl.py`, `scrapers/lanl.py`,
+    `scrapers/slac.py`, `scrapers/aps.py` — **all real, live-tested,
+    working** (2026-08-24, see "Session 2" above for what each one found
+    and why). All are plain public JSON-API or unauthenticated-HTML
+    scrapers, no Playwright/browser automation needed for any of them, no
+    bot-detection fought or bypassed anywhere. All ignore
+    `location`/`radius_miles` (each is a single employer's postings or a
+    non-geographic board) — accepted only for interface parity with the
+    other `search_*` functions.
   - `main.py`'s `_run_sweep()` takes a `sites` list (`indeed`,
-    `ziprecruiter`, `usajobs`, `pnnl`) so any subset can be searched — this
-    is what the home page's checkboxes control.
+    `ziprecruiter`, `usajobs`, `pnnl`, `anl`, `fnal`, `aps`, `llnl`,
+    `lanl`, `bnl`, `slac`) so any subset can be searched — this is what
+    the home page's checkboxes control.
 - **Scoring** (`matcher/scorer.py`, `config.py`):
   - `SEARCH_KEYWORDS` / `SECTOR_WEIGHTS` — the "specialization" list (grown
     across multiple rounds: core physics/engineering/chem/materials/CS/math,
@@ -259,34 +268,65 @@ this list exists as a clean starting point):
    handler is defensive but unverified in practice. Taleo and
    SuccessFactors are gated the same way as Workday (account creation
    required). See "Session 2" above.
-4. **National Labs section** — DOE national labs (Livermore, Los Alamos,
-   Oak Ridge, PNNL, Sandia, Argonne, Fermilab, Brookhaven, SLAC, etc.).
-   **PNNL done, same Session 2**: `scrapers/pnnl.py` built and
-   live-tested end-to-end through `main.py`'s real `_run_sweep()` — found,
-   scored, and logged 25 real jobs to the DB on a two-keyword test. Turned
-   out PNNL has a genuine public JSON API behind careers.pnnl.gov
-   (`/api/jobs`, found via live network inspection, not documentation) —
-   no browser automation needed, same tier as USAJobs.gov. Every posting's
-   `apply_url` points to `careers-pnnl.icims.com`, so `ats/icims.py`
-   already covers the application side once these reach that stage. Wired
-   into `main.py` (`VALID_SITES`, `_run_sweep`) and the dashboard home page
-   (`dashboard/app.py`'s `VALID_SITES` — the template renders checkboxes
-   dynamically, so no template edit was needed).
-   The other labs (Livermore, Los Alamos, Oak Ridge, Sandia, Argonne,
-   Fermilab, Brookhaven, SLAC) are still untouched — worth checking each
-   for a similar JSON API before assuming HTML scraping is needed; several
-   are also contractor-operated the same way PNNL is (Battelle), so
-   USAJobs.gov likely won't cover them either.
-5. **NSF (National Science Foundation) section** — NSF is a federal agency,
-   so its own direct positions likely already get covered by USAJobs once
-   that's live-tested; the user wants an explicit section anyway, worth
-   checking whether that's redundant with USAJobs or needs something
-   separate (e.g. NSF-funded fellowship/research opportunities aren't the
-   same as direct NSF employment).
-6. **APS (American Physical Society) jobs board section** — aps.org has a
-   physics-specific job board (sometimes run via a partner site — verify
-   the actual current URL/platform live, don't assume). Not started. High
-   relevance given the user's field.
+4. ~~**National Labs section**~~ — **7 of 8 done, Session 2 (2026-08-24),
+   parallelized across 4 background agents + this session.** DOE national
+   labs are contractor-operated, so USAJobs.gov doesn't cover them; each
+   needed its own source, same process as Indeed/ZipRecruiter/Greenhouse/
+   Lever before. All of the below are wired into `main.py` (`VALID_SITES`,
+   `_run_sweep`) and `dashboard/app.py`'s `VALID_SITES` (checkboxes render
+   dynamically from that list — no template edits needed), and each was
+   independently re-verified and live-tested through `main.py`'s real
+   `_run_sweep()` (not just standalone) before being committed:
+   - **PNNL** (`scrapers/pnnl.py`) — public JSON API at careers.pnnl.gov
+     (`/api/jobs`). Apply URLs route through `careers-pnnl.icims.com`, so
+     `ats/icims.py` already covers the application side.
+   - **Argonne/ANL** (`scrapers/anl.py`) and **Fermilab/FNAL**
+     (`scrapers/fnal.py`) — both run on Workday. **Notable, broadly
+     reusable finding**: Workday's *application* flow requires account
+     creation (`ats/workday.py`), but Workday's job-*search* API (the
+     "CXS" endpoint, `/wday/cxs/<tenant>/<site>/jobs`) is public and needs
+     no login at all — it's what Workday's own search UI calls
+     client-side. This likely applies to any Workday-hosted employer, not
+     just these two labs.
+   - **Brookhaven/BNL** (`scrapers/bnl.py`) — a third Workday tenant, same
+     CXS-API pattern (this one 400s above `limit=20`, so it paginates).
+   - **Livermore/LLNL** (`scrapers/llnl.py`) — public SmartRecruiters
+     postings API (`api.smartrecruiters.com`), no auth for search even
+     though `ats/smartrecruiters.py` found the *apply* flow blocked by
+     SmartRecruiters' own bot detection — a similar split to Workday's.
+   - **Los Alamos/LANL** (`scrapers/lanl.py`) — has two separate career
+     surfaces. `jobs.lanl.gov` (Oracle iRecruitment) is genuinely
+     bot-walled (an F5 JS challenge, no content without executing it) and
+     is skipped entirely, same "don't fight it" call as ZipRecruiter's
+     Cloudflare block. A separate, modern front end at `lanl.jobs` has no
+     such wall and its own public JSON API — that's what's scraped.
+   - **SLAC** (`scrapers/slac.py`) — unlike the other contractor-run labs,
+     SLAC is operated directly by Stanford, so it runs on Oracle Fusion
+     Cloud Recruiting via Stanford's own infrastructure
+     (careersearch.stanford.edu) — a structurally different, but still
+     public/unauthenticated, REST API.
+   - None of these APIs expose a structured salary field — every one of
+     these six modules honestly reports `salary: None` rather than
+     regex-guessing a number out of free-text descriptions.
+   - **Oak Ridge (ORNL) and Sandia (SNL) still pending** — a background
+     agent was still working on these as of this write-up; check for its
+     results and wire them in the same way if not already done.
+5. ~~**NSF section**~~ — **Done, Session 2.** Researched and correctly
+   concluded no scraper is warranted: NSF-funded opportunities (distinct
+   from direct NSF employment, which USAJobs already covers) are posted
+   individually by each university/PI with no NSF-run aggregator worth
+   scraping — verified live against nsf.gov's actual funding/postdoc pages
+   rather than assumed. Don't revisit this without new information.
+6. ~~**APS jobs board section**~~ — **Done, Session 2.** Real job board at
+   apsphysicsjobs.com (careers.aps.org redirects there), run on the Madgex
+   platform — verified live, not assumed. No JSON API, but plain
+   server-rendered HTML with no bot-detection, so `scrapers/aps.py` does a
+   plain `requests` GET + parse. Live-tested through `_run_sweep()`, wired
+   in. Notably international in scope (CERN, etc.) — a first for this
+   project, everything else is US-only. Known limitation: no working
+   pagination was found (several common param names tried, all no-ops),
+   so only the first ~10 results per keyword are returned — still useful
+   signal given APS/Physics World Jobs is a low-volume board.
 
 Older items, still open from before this list:
 - **ZipRecruiter auth retry** — Cloudflare-blocked login and a failed
