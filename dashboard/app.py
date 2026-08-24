@@ -16,7 +16,7 @@ from db.database import get_conn, restore_job, set_application_status  # noqa: E
 ROOT = Path(__file__).parent.parent
 RESUME_DIR = ROOT / "resume"
 SWEEP_LOCK_PATH = Path(__file__).parent / ".sweep_lock.json"
-VALID_SITES = ["indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal"]
+VALID_SITES = ["indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal", "aps"]
 VALID_MODES = ["local", "remote", "life_change"]
 STATUS_TABS = [
     "needs_review", "discovered", "submitted", "skipped", "rejected",
