@@ -304,6 +304,16 @@ this is fully working now, don't redo the setup).
     (confirmed live), cookie-export from the user's own browser also failed
     ("kept glitching out," never diagnosed further). Accepted limitation —
     do not attempt to bypass/spoof Cloudflare.
+  - **Indeed's `/rc/clk?jk=...` click-tracking redirect is itself
+    bot-walled** (2026-08-26 finding, confirmed live on two separate real
+    jobs): navigating to it returns a page titled "Blocked - Indeed.com"
+    before any real redirect happens, distinct from (and stricter than) the
+    search-results-page scraping that already works fine. This means
+    `ats/apply.py`'s post-navigation platform re-detection (see below)
+    cannot resolve Indeed/ZipRecruiter jobs to their real ATS in practice —
+    every attempt hits this wall first. Not fought or worked around, same
+    standing rule as ZipRecruiter's Cloudflare block above. If this ever
+    needs revisiting, don't just retry harder — that's the wrong move here.
   - `scrapers/usajobs.py` — see "Current real state" above, needs live
     verification.
   - `scrapers/pnnl.py`, `scrapers/anl.py`, `scrapers/fnal.py`,
