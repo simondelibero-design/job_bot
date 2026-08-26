@@ -141,6 +141,11 @@ SEARCH_KEYWORDS = [
     "actuarial analyst", "quantitative analyst",
     # round 2: STEM education/outreach (real Club Z tutoring background)
     "stem outreach coordinator", "science education specialist", "curriculum developer",
+    # round 3: atmospheric/oceanic (NOAA is fully covered by the usajobs
+    # source already, but a generic "physics"/"physicist" sweep misses its
+    # postings entirely — confirmed live 2026-08-26, these four terms
+    # surface real, distinct NOAA jobs a plain physics search doesn't)
+    "oceanographer", "atmospheric scientist", "meteorologist", "NOAA",
 ]
 
 # Case-insensitive substring match against title + snippet. Weight scale is
