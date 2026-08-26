@@ -246,14 +246,15 @@ Location: `~/Desktop/job-bot/`. **Pushed to a private GitHub repo**:
 https://github.com/simondelibero-design/job_bot (see Git section below —
 this is fully working now, don't redo the setup).
 
-## Current real state (verified 2026-08-26, commit `13e1310`)
+## Current real state (verified 2026-08-26, commit `a385cd3`)
 
-- **3,324 jobs** in `db/jobs.db`: 1,554 local, 1,265 remote, 505 life_change.
-  The remote bump across Sessions 2-3 is real postings from smoke-testing
-  each new scraper end-to-end (1-2 keyword tests each, not full sweeps) —
-  everything else is the original full 99-keyword Indeed+ZipRecruiter sweep
-  from 2026-08-21, not a partial/test run. A real full sweep with all 21
-  sources enabled hasn't been run yet — worth doing to get proper
+- **3,356 jobs** in `db/jobs.db`: 1,564 local, 1,287 remote, 505 life_change.
+  The remote/local bump across Sessions 2-3 is real postings from
+  smoke-testing each new scraper end-to-end (1-2 keyword tests each, not
+  full sweeps) — everything else is the original full 99-keyword
+  Indeed+ZipRecruiter sweep from 2026-08-21, not a partial/test run. A real
+  full sweep with all 21 sources enabled (USAJobs among them now actually
+  live, not just built) hasn't been run yet — worth doing to get proper
   multi-keyword coverage from all the new sources rather than just the 1-2
   keywords each got smoke-tested with.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
@@ -261,19 +262,20 @@ this is fully working now, don't redo the setup).
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
   sweep, see live status) and **`/queue`** (the actual job review list with
   all the status/PhD tabs).
-- **USAJobs.gov integration built, still NOT live-tested** — no API key has
-  been saved yet. `scrapers/save_usajobs_key.py` exists (untracked helper,
-  found sitting in the repo 2026-08-24 — unclear which session added it)
-  that prompts for the key interactively and writes
-  `scrapers/usajobs_credentials.json` (gitignored) locally, never sending
-  it anywhere else. User needs to: register free at
-  https://developer.usajobs.gov/ (self-service, email-based), then run
-  `python scrapers/save_usajobs_key.py` himself — same credential boundary
-  as everywhere else in this project. Then run `python scrapers/usajobs.py`
-  standalone to sanity-check a live response before trusting it in a real
-  sweep — the field-name assumptions (`PositionTitle`,
-  `PositionRemuneration`, etc.) still come from documentation, not a live
-  response.
+- **USAJobs.gov integration — live-tested and working (2026-08-26).** The
+  user registered his own key and ran `scrapers/save_usajobs_key.py`
+  himself (same credential boundary held throughout — never done by the
+  assistant). First-ever live test against a real key found a real bug:
+  USAJobs' `LocationName` param silently returns zero results for a full
+  street address (`config.LOCATION["query"]`, which Indeed/ZipRecruiter
+  handle fine) — needs just "City, State". Fixed with a
+  `_to_city_state()` normalizer in `scrapers/usajobs.py`; live-verified
+  through `main.py`'s real `_run_sweep()` for both local mode (10 real
+  jobs — previously silently 0, forever, if this had shipped untested) and
+  remote mode (25 real jobs, confirming the already-working nationwide
+  path wasn't broken by the fix). Field-name assumptions from the
+  original doc-only build (title, company, location, salary, url,
+  snippet) all confirmed correct against real responses.
 
 ## Git / GitHub (fully working, don't redo this)
 
@@ -314,8 +316,9 @@ this is fully working now, don't redo the setup).
     every attempt hits this wall first. Not fought or worked around, same
     standing rule as ZipRecruiter's Cloudflare block above. If this ever
     needs revisiting, don't just retry harder — that's the wrong move here.
-  - `scrapers/usajobs.py` — see "Current real state" above, needs live
-    verification.
+  - `scrapers/usajobs.py` — **live-verified and working**, see "Current
+    real state" above for the location-format bug that was found and
+    fixed in the process.
   - `scrapers/pnnl.py`, `scrapers/anl.py`, `scrapers/fnal.py`,
     `scrapers/bnl.py`, `scrapers/llnl.py`, `scrapers/lanl.py`,
     `scrapers/slac.py`, `scrapers/ornl.py`, `scrapers/snl.py`,
@@ -439,8 +442,9 @@ User's most recent ask, to be tackled in this rough order once picked back
 up (he said to prioritize finishing prior open items first, which is why
 this list exists as a clean starting point):
 
-1. **Government jobs** — USAJobs.gov integration is built (see above), needs
-   an API key + live test to actually verify it before trusting it.
+1. ~~**Government jobs**~~ — **Done, 2026-08-26.** USAJobs.gov live-tested
+   with a real key, one real bug found and fixed (see "Current real state"
+   above). This was the very first item on this list — now fully closed.
 2. ~~**Troubleshoot the Workday/iCIMS hangup precisely**~~ — **Done, Session
    2.** Both confirmed to have structural account/CAPTCHA gates, not tool
    glitches. See "Session 2" above.
