@@ -210,6 +210,22 @@
             </div>
           </details>
           {% endif %}
+
+          {% if company_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="companies" checked>
+              </span>
+              Companies ({{ company_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in company_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="companies" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
         </div>
         <div class="checks">
           <strong style="font-size:13px; color:var(--muted);">Modes</strong>

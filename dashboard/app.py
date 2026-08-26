@@ -25,10 +25,15 @@ SWEEP_LOCK_PATH = Path(__file__).parent / ".sweep_lock.json"
 # later ("Other National Labs") — see HANDOFF.md for which session added
 # which. New lab sources should get added to OTHER_NATIONAL_LAB_SITES
 # (alphabetized) rather than the first group, to keep that history legible.
-GENERAL_SITES = ["aps", "indeed", "usajobs", "ziprecruiter"]
+GENERAL_SITES = ["aps", "indeed", "physicstoday", "physicsworldjobs", "usajobs", "ziprecruiter"]
 NATIONAL_LAB_SITES = ["anl", "bnl", "fnal", "lanl", "llnl", "ornl", "pnnl", "slac", "snl"]
 OTHER_NATIONAL_LAB_SITES = ["ames", "inl", "jlab", "lbnl", "nrel", "pppl", "srnl"]
-VALID_SITES = GENERAL_SITES + NATIONAL_LAB_SITES + OTHER_NATIONAL_LAB_SITES
+# Individual employers (aerospace/defense/quantum-computing companies, etc.)
+# rather than aggregators or DOE labs — its own collapsible group on the
+# home page, alphabetized, for the same legibility reason as the two
+# national-lab groups above.
+COMPANY_SITES = ["anduril", "ionq", "psiquantum", "quantinuum"]
+VALID_SITES = GENERAL_SITES + NATIONAL_LAB_SITES + OTHER_NATIONAL_LAB_SITES + COMPANY_SITES
 VALID_MODES = ["local", "remote", "life_change"]
 STATUS_TABS = [
     "needs_review", "discovered", "submitted", "skipped", "rejected",
@@ -76,6 +81,7 @@ def home():
         general_sites=GENERAL_SITES,
         national_lab_sites=NATIONAL_LAB_SITES,
         other_national_lab_sites=OTHER_NATIONAL_LAB_SITES,
+        company_sites=COMPANY_SITES,
         modes=VALID_MODES,
         sweep=sweep_status(),
         distance=load_distance_settings(),

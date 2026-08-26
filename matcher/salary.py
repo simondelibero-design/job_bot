@@ -12,7 +12,10 @@ _HOURLY_RE = re.compile(r"(an hour|/hr|per hour|\bhr\b)", re.I)
 def parse_salary_annual(salary: str | None) -> float | None:
     if not salary:
         return None
-    numbers = [float(n.replace(",", "")) for n in re.findall(r"[\d,]+(?:\.\d+)?", salary)]
+    # Must start with a digit — `[\d,]+` alone also matches a bare comma
+    # (e.g. a scraped salary like ", DOE" or a stray "$,"), which crashed
+    # float("") live during a full sweep (2026-08-26).
+    numbers = [float(n.replace(",", "")) for n in re.findall(r"\d[\d,]*(?:\.\d+)?", salary)]
     if not numbers:
         return None
     midpoint = sum(numbers) / len(numbers)

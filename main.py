@@ -23,12 +23,14 @@ from config import LIFE_CHANGE_SEARCH_RADIUS_MILES, LOCATION, SEARCH_KEYWORDS
 from db.database import init_db, upsert_job, top_jobs
 from matcher.scorer import score_job
 from scrapers.ames import search_ames
+from scrapers.anduril import search_anduril
 from scrapers.anl import search_anl
 from scrapers.aps import search_aps
 from scrapers.bnl import search_bnl
 from scrapers.fnal import search_fnal
 from scrapers.indeed import search_indeed
 from scrapers.inl import search_inl
+from scrapers.ionq import search_ionq
 from scrapers.jlab import search_jlab
 from scrapers.lanl import search_lanl
 from scrapers.lbnl import search_lbnl
@@ -36,7 +38,11 @@ from scrapers.llnl import search_llnl
 from scrapers.nrel import search_nrel
 from scrapers.ornl import search_ornl
 from scrapers.pnnl import search_pnnl
+from scrapers.physicstoday import search_physicstoday
+from scrapers.physicsworldjobs import search_physicsworldjobs
 from scrapers.pppl import search_pppl
+from scrapers.psiquantum import search_psiquantum
+from scrapers.quantinuum import search_quantinuum
 from scrapers.slac import search_slac
 from scrapers.snl import search_snl
 from scrapers.srnl import search_srnl
@@ -62,6 +68,8 @@ VALID_SITES = {
     "indeed", "ziprecruiter", "usajobs", "aps",
     "pnnl", "anl", "fnal", "llnl", "lanl", "bnl", "slac", "ornl", "snl",
     "ames", "jlab", "pppl", "srnl", "nrel", "inl", "lbnl",
+    "quantinuum", "physicstoday", "physicsworldjobs",
+    "ionq", "anduril", "psiquantum",
 }
 
 
@@ -217,6 +225,48 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_lbnl(keyword, headless=headless)
             except Exception as e:
                 print(f"  lbnl search failed for '{keyword}': {e}")
+
+        if "quantinuum" in sites:
+            print(f"[{mode}][quantinuum] searching: {keyword}")
+            try:
+                found_this_keyword += search_quantinuum(keyword)
+            except Exception as e:
+                print(f"  quantinuum search failed for '{keyword}': {e}")
+
+        if "physicstoday" in sites:
+            print(f"[{mode}][physicstoday] searching: {keyword}")
+            try:
+                found_this_keyword += search_physicstoday(keyword)
+            except Exception as e:
+                print(f"  physicstoday search failed for '{keyword}': {e}")
+
+        if "physicsworldjobs" in sites:
+            print(f"[{mode}][physicsworldjobs] searching: {keyword}")
+            try:
+                found_this_keyword += search_physicsworldjobs(keyword)
+            except Exception as e:
+                print(f"  physicsworldjobs search failed for '{keyword}': {e}")
+
+        if "ionq" in sites:
+            print(f"[{mode}][ionq] searching: {keyword}")
+            try:
+                found_this_keyword += search_ionq(keyword)
+            except Exception as e:
+                print(f"  ionq search failed for '{keyword}': {e}")
+
+        if "anduril" in sites:
+            print(f"[{mode}][anduril] searching: {keyword}")
+            try:
+                found_this_keyword += search_anduril(keyword)
+            except Exception as e:
+                print(f"  anduril search failed for '{keyword}': {e}")
+
+        if "psiquantum" in sites:
+            print(f"[{mode}][psiquantum] searching: {keyword}")
+            try:
+                found_this_keyword += search_psiquantum(keyword)
+            except Exception as e:
+                print(f"  psiquantum search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(
