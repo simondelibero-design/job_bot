@@ -31,6 +31,7 @@ from scrapers.boeing import search_boeing
 from scrapers.clearancejobs import search_clearancejobs
 from scrapers.draper import search_draper
 from scrapers.fnal import search_fnal
+from scrapers.general_dynamics import search_general_dynamics
 from scrapers.indeed import search_indeed
 from scrapers.inl import search_inl
 from scrapers.ionq import search_ionq
@@ -38,6 +39,9 @@ from scrapers.jlab import search_jlab
 from scrapers.lanl import search_lanl
 from scrapers.lbnl import search_lbnl
 from scrapers.llnl import search_llnl
+from scrapers.lockheed_martin import search_lockheed_martin
+from scrapers.mitre import search_mitre
+from scrapers.northrop_grumman import search_northrop_grumman
 from scrapers.nrel import search_nrel
 from scrapers.ornl import search_ornl
 from scrapers.pnnl import search_pnnl
@@ -48,6 +52,7 @@ from scrapers.psiquantum import search_psiquantum
 from scrapers.quantinuum import search_quantinuum
 from scrapers.slac import search_slac
 from scrapers.snl import search_snl
+from scrapers.spacex import search_spacex
 from scrapers.srnl import search_srnl
 from scrapers.usajobs import search_usajobs
 from scrapers.ziprecruiter import search_ziprecruiter
@@ -73,6 +78,7 @@ VALID_SITES = {
     "ames", "jlab", "pppl", "srnl", "nrel", "inl", "lbnl",
     "quantinuum", "physicstoday", "physicsworldjobs",
     "ionq", "anduril", "psiquantum", "boeing", "draper", "clearancejobs",
+    "northrop_grumman", "lockheed_martin", "general_dynamics", "mitre", "spacex",
 }
 
 
@@ -291,6 +297,41 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_clearancejobs(keyword, location_query, radius)
             except Exception as e:
                 print(f"  clearancejobs search failed for '{keyword}': {e}")
+
+        if "northrop_grumman" in sites:
+            print(f"[{mode}][northrop_grumman] searching: {keyword}")
+            try:
+                found_this_keyword += search_northrop_grumman(keyword)
+            except Exception as e:
+                print(f"  northrop_grumman search failed for '{keyword}': {e}")
+
+        if "lockheed_martin" in sites:
+            print(f"[{mode}][lockheed_martin] searching: {keyword}")
+            try:
+                found_this_keyword += search_lockheed_martin(keyword)
+            except Exception as e:
+                print(f"  lockheed_martin search failed for '{keyword}': {e}")
+
+        if "general_dynamics" in sites:
+            print(f"[{mode}][general_dynamics] searching: {keyword}")
+            try:
+                found_this_keyword += search_general_dynamics(keyword)
+            except Exception as e:
+                print(f"  general_dynamics search failed for '{keyword}': {e}")
+
+        if "mitre" in sites:
+            print(f"[{mode}][mitre] searching: {keyword}")
+            try:
+                found_this_keyword += search_mitre(keyword)
+            except Exception as e:
+                print(f"  mitre search failed for '{keyword}': {e}")
+
+        if "spacex" in sites:
+            print(f"[{mode}][spacex] searching: {keyword}")
+            try:
+                found_this_keyword += search_spacex(keyword)
+            except Exception as e:
+                print(f"  spacex search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(
