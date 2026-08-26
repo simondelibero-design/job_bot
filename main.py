@@ -22,17 +22,21 @@ sys.path.append(str(Path(__file__).parent))
 from config import LIFE_CHANGE_SEARCH_RADIUS_MILES, LOCATION, SEARCH_KEYWORDS
 from db.database import init_db, upsert_job, top_jobs
 from matcher.scorer import score_job
+from scrapers.ames import search_ames
 from scrapers.anl import search_anl
 from scrapers.aps import search_aps
 from scrapers.bnl import search_bnl
 from scrapers.fnal import search_fnal
 from scrapers.indeed import search_indeed
+from scrapers.jlab import search_jlab
 from scrapers.lanl import search_lanl
 from scrapers.llnl import search_llnl
 from scrapers.ornl import search_ornl
 from scrapers.pnnl import search_pnnl
+from scrapers.pppl import search_pppl
 from scrapers.slac import search_slac
 from scrapers.snl import search_snl
+from scrapers.srnl import search_srnl
 from scrapers.usajobs import search_usajobs
 from scrapers.ziprecruiter import search_ziprecruiter
 
@@ -51,7 +55,11 @@ def _zip_auth_kwargs() -> dict:
     }
 
 
-VALID_SITES = {"indeed", "ziprecruiter", "usajobs", "pnnl", "anl", "fnal", "aps", "llnl", "lanl", "bnl", "slac", "ornl", "snl"}
+VALID_SITES = {
+    "indeed", "ziprecruiter", "usajobs", "aps",
+    "pnnl", "anl", "fnal", "llnl", "lanl", "bnl", "slac", "ornl", "snl",
+    "ames", "jlab", "pppl", "srnl",
+}
 
 
 def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
@@ -157,6 +165,34 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_snl(keyword, headless=headless)
             except Exception as e:
                 print(f"  snl search failed for '{keyword}': {e}")
+
+        if "ames" in sites:
+            print(f"[{mode}][ames] searching: {keyword}")
+            try:
+                found_this_keyword += search_ames(keyword)
+            except Exception as e:
+                print(f"  ames search failed for '{keyword}': {e}")
+
+        if "jlab" in sites:
+            print(f"[{mode}][jlab] searching: {keyword}")
+            try:
+                found_this_keyword += search_jlab(keyword)
+            except Exception as e:
+                print(f"  jlab search failed for '{keyword}': {e}")
+
+        if "pppl" in sites:
+            print(f"[{mode}][pppl] searching: {keyword}")
+            try:
+                found_this_keyword += search_pppl(keyword)
+            except Exception as e:
+                print(f"  pppl search failed for '{keyword}': {e}")
+
+        if "srnl" in sites:
+            print(f"[{mode}][srnl] searching: {keyword}")
+            try:
+                found_this_keyword += search_srnl(keyword)
+            except Exception as e:
+                print(f"  srnl search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(
