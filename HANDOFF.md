@@ -333,6 +333,42 @@ bug — see git history for exact recovery steps if this happens again).
   this is the load-bearing entry to read before touching anything
   Indeed/ZipRecruiter-adjacent again.
 
+## Next up (planned 2026-08-26, not started — pick up here)
+
+Two new dashboard sub-pages, requested but explicitly deferred until a
+brainstormed field list (below) is settled first:
+- **`/profile`** — a bank of application-question prompts mapped to the
+  user's own stock answers, reusable across ATS auto-fill instead of
+  re-answering the same custom questions per posting.
+- **`/struggles_to_answer`** — an inbox of prompts encountered during
+  auto-fill that don't have an answer yet. Likely data source: the
+  `applications.notes` field, where every `ats/*.py` handler already logs
+  unanswerable custom questions into `needs_review` (see e.g.
+  `ats/greenhouse.py`) — this would surface that same data as an actionable
+  list instead of it just sitting in the DB.
+Front-end build (actually wiring these into the dashboard so answers can be
+entered) comes after the field-list brainstorm below is used to inform what
+kinds of prompts/fields to expect.
+
+**Field brainstorm for applied physics** (requested 2026-08-26, to guide
+both future discovery sources and what `/profile` should anticipate).
+Already covered by an existing source: aerospace/defense (Boeing, Lockheed,
+Northrop, GD, Anduril, SpaceX, ClearanceJobs), the 17 DOE national labs,
+quantum computing (IonQ, Rigetti, PsiQuantum, Quantinuum, Atom Computing),
+general/academic physics (APS, Physics Today, Physics World — includes
+CERN and faculty postings), and federal government broadly (USAJobs). NOT
+yet covered — candidate fields for a future discovery-source batch:
+semiconductors/microelectronics, photonics & optics, renewable/clean
+energy & fusion startups, advanced nuclear (fission/fusion beyond the DOE
+labs), medical physics & biophysics, materials science, quantitative
+finance ("quant" — physics grads are heavily recruited by trading firms),
+metrology/instrumentation, geophysics & oil/gas, telecom & RF engineering,
+acoustics, robotics/automation/controls, automotive & autonomous-vehicle
+sensors (LIDAR), the broader satellite/space industry beyond the majors,
+cryogenics & superconducting tech, additive manufacturing, patent
+law/technical IP consulting, science policy & regulation (NIST, NRC, FCC,
+FDA), atmospheric/climate science (NOAA), and STEM education/outreach.
+
 ## What this project is
 
 An automated job-search pipeline for Simon DeLibero (Applied Physics B.S.
