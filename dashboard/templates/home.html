@@ -16,6 +16,12 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
   .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .card-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .card-header-row h2 { margin: 0; }
+  .easy-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted);
+                 cursor: pointer; user-select: none; }
+  .easy-toggle input { accent-color: var(--good); }
+  .easy-toggle:has(input:checked) { color: var(--good); }
   .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px;
               border-bottom: 1px solid #2a2c36; }
   .stat-row:last-child { border-bottom: none; }
@@ -151,7 +157,12 @@
     </div>
 
     <div class="card">
-      <h2>Run a discovery sweep</h2>
+      <div class="card-header-row">
+        <h2>Run a discovery sweep</h2>
+        <label class="easy-toggle" title="Only show jobs whose application can be fully filled out with no account/CAPTCHA gate in the way">
+          <input type="checkbox" id="easy-apply-toggle"> Easy Apply Only
+        </label>
+      </div>
 
       {% if sweep %}
         {% if sweep.status == 'running' %}
@@ -213,7 +224,7 @@
     </div>
   </div>
 
-  <a class="queue-link" href="{{ url_for('queue') }}">Go to review queue →</a>
+  <a class="queue-link" id="queue-link" href="{{ url_for('queue') }}">Go to review queue →</a>
 
 <script>
 (function() {
@@ -340,6 +351,21 @@
       });
     });
   });
+})();
+
+(function() {
+  // "Easy Apply Only" toggle — updates where "Go to review queue" links to,
+  // rather than filtering anything on this page (nothing here lists jobs).
+  var toggle = document.getElementById('easy-apply-toggle');
+  var link = document.getElementById('queue-link');
+  var baseHref = link.getAttribute('href');
+
+  function render() {
+    link.setAttribute('href', toggle.checked ? baseHref + '?easy=1' : baseHref);
+  }
+
+  toggle.addEventListener('change', render);
+  render();
 })();
 </script>
 </body>

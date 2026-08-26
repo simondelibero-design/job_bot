@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Flask, redirect, render_template, request, url_for
 
 sys.path.append(str(Path(__file__).parent.parent))
+from ats.detect import is_easy_apply  # noqa: E402
 from config import DEFAULT_DISTANCE_SETTINGS, SETTINGS_PATH, load_distance_settings  # noqa: E402
 from db.database import get_conn, restore_job, set_application_status  # noqa: E402
 
@@ -130,6 +131,7 @@ def run_sweep():
 @app.route("/queue")
 def queue():
     status_filter = request.args.get("status", "needs_review")
+    easy_only = request.args.get("easy") == "1"
     with get_conn() as conn:
         query = (
             "SELECT jobs.*, applications.status AS app_status, "
@@ -153,13 +155,23 @@ def queue():
             if status_filter != "all":
                 query += "AND applications.status = ? "
                 params = (status_filter,)
-        query += "ORDER BY jobs.priority_score DESC, jobs.discovered_at DESC LIMIT 200"
+        query += "ORDER BY jobs.priority_score DESC, jobs.discovered_at DESC"
+        # "Easy apply" is a small slice of the whole queue (only a few
+        # sources store a URL that already resolves to one of the
+        # EASY_APPLY_PLATFORMS — see ats/detect.py), so the normal 200-row
+        # cap would often cut them all off before the Python-side filter
+        # below ever sees them. Fetch a wider window in that case, filter,
+        # then cap to the same 200 for display.
+        query += " LIMIT 2000" if easy_only else " LIMIT 200"
         rows = [dict(r) for r in conn.execute(query, params).fetchall()]
         for row in rows:
             try:
                 row["matched_keywords"] = json.loads(row.get("matched_keywords") or "[]")
             except (TypeError, ValueError):
                 row["matched_keywords"] = []
+
+    if easy_only:
+        rows = [r for r in rows if is_easy_apply(r.get("url"))][:200]
 
     return render_template(
         "index.html",
@@ -169,6 +181,7 @@ def queue():
         phd_tabs=PHD_TABS,
         resumes=available_resumes(),
         default_resume=DEFAULT_RESUME,
+        easy_only=easy_only,
     )
 
 

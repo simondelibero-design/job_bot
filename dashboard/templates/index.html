@@ -17,6 +17,9 @@
   .tabs a { padding: 6px 12px; border-radius: 6px; text-decoration: none; color: var(--text);
             border: 1px solid var(--border); font-size: 13px; background: var(--card); }
   .tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .easy-banner { background: #14301f; color: var(--good); border-radius: 8px; padding: 10px 14px;
+                 font-size: 13px; margin-bottom: 16px; }
+  .easy-banner a { color: var(--good); font-weight: 600; margin-left: 8px; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
           padding: 16px; margin-bottom: 12px; }
   .row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
@@ -60,9 +63,16 @@
     · <a href="{{ url_for('home') }}">← Home</a>
   </div>
 
+  {% if easy_only %}
+    <div class="easy-banner">
+      Easy Apply only — showing jobs whose application can be fully filled out with no account/CAPTCHA gate in the way.
+      <a href="{{ url_for('queue', status=status_filter) }}">Show all →</a>
+    </div>
+  {% endif %}
+
   <div class="tabs">
     {% for tab in tabs %}
-      <a href="{{ url_for('queue', status=tab) }}" class="{{ 'active' if tab == status_filter else '' }}">{{ tab.replace('_', ' ') }}</a>
+      <a href="{{ url_for('queue', status=tab, easy=('1' if easy_only else none)) }}" class="{{ 'active' if tab == status_filter else '' }}">{{ tab.replace('_', ' ') }}</a>
     {% endfor %}
   </div>
 

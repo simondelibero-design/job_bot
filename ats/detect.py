@@ -25,3 +25,25 @@ def detect_platform(url: str) -> str:
         if pattern.search(url):
             return platform
     return "unknown"
+
+
+# Platforms whose ats/ handler actually fills the real application form with
+# no structural gate in the way — no account creation required, no CAPTCHA
+# blocking access to the fields themselves (a CAPTCHA on the final submit
+# button doesn't count against this — every fully-fillable form here has
+# one, it's still the human's job to solve regardless). See each handler's
+# docstring for what was actually verified live before it landed here.
+#
+# smartrecruiters is deliberately NOT included even though ats/smartrecruiters.py
+# can fill its form in principle: SmartRecruiters' own bot detection blocked
+# every attempt to even reach the form this session (see that file's
+# docstring), so in current practice it does not satisfy "can actually be
+# filled out." icims/slac only ever get a single field (email) pre-filled
+# before hitting a real gate, so they're partial, not "fully filled."
+# workday/taleo/successfactors/ornl/lanl/snl are pure gate-detectors — no
+# field gets filled at all.
+EASY_APPLY_PLATFORMS = {"greenhouse", "lever", "jazzhr", "aps"}
+
+
+def is_easy_apply(url: str) -> bool:
+    return detect_platform(url) in EASY_APPLY_PLATFORMS
