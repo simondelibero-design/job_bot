@@ -73,6 +73,23 @@ def _extract_job(descriptor: dict, keyword: str) -> dict | None:
     }
 
 
+def _to_city_state(location: str) -> str:
+    """USAJobs' LocationName silently returns zero results for a full
+    street address (confirmed live 2026-08-26: "1410 10th Ave, Milton, WA
+    98354" -> 0 results, "Milton, WA" -> 6, same keyword/radius) — it wants
+    just "City, State" or a ZIP. If `location` looks like a full mailing
+    address (a street segment before the city), collapse it to the last
+    two comma-separated segments and strip any trailing ZIP. Locations that
+    are already just "City, State" (or anything without a leading street
+    number) pass through unchanged."""
+    parts = [p.strip() for p in location.split(",")]
+    if len(parts) < 3:
+        return location
+    city, state_zip = parts[-2], parts[-1]
+    state = re.sub(r"\s*\d{5}(-\d{4})?$", "", state_zip).strip()
+    return f"{city}, {state}"
+
+
 def search_usajobs(keyword: str, location: str, radius_miles: int, results_per_page: int = 25) -> list[dict]:
     creds = _load_credentials()
     headers = {
@@ -89,7 +106,7 @@ def search_usajobs(keyword: str, location: str, radius_miles: int, results_per_p
     # those so it searches nationwide instead of erroring or returning zero
     # results on an unresolvable place name.
     if location and location.lower() not in ("remote", "united states"):
-        params["LocationName"] = location
+        params["LocationName"] = _to_city_state(location)
         params["Radius"] = radius_miles
 
     resp = requests.get(BASE_URL, headers=headers, params=params, timeout=20)
