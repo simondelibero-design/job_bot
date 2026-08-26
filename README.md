@@ -1,4 +1,4 @@
-# job-bot
+# Retiarius
 
 Personal job-search automation for Simon: discovers listings on Indeed and
 ZipRecruiter near Tacoma, WA, scores them against target sectors, and logs
@@ -8,7 +8,7 @@ phase only does discovery + scoring + logging.
 ## Setup
 
 ```bash
-cd ~/Desktop/job-bot
+cd ~/Desktop/retiarius
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt

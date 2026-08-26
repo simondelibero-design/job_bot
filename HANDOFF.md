@@ -1,4 +1,4 @@
-# job-bot — Handoff
+# Retiarius — Handoff
 
 Originally rewritten 2026-08-21 after a prior chat session hit three `[bio]`
 platform blocks and recommended starting fresh. A follow-up session on
@@ -242,9 +242,12 @@ submit click. That line has been held firmly through the whole project
 despite repeated pressure to place hidden AI-screener-manipulation text in
 the resume — always declined, in every framing tried.
 
-Location: `~/Desktop/job-bot/`. **Pushed to a private GitHub repo**:
-https://github.com/simondelibero-design/job_bot (see Git section below —
-this is fully working now, don't redo the setup).
+Location: `~/Desktop/retiarius/`. **Pushed to a private GitHub repo**:
+https://github.com/simondelibero-design/retiarius (see Git section below —
+this is fully working now, don't redo the setup). Renamed from `job-bot`/
+`job_bot` on 2026-08-26 (local folder, GitHub repo, and all in-project
+branding) — GitHub redirects the old repo URL automatically, so existing
+clones/links still resolve.
 
 ## Current real state (verified 2026-08-26, commit `a385cd3`)
 
@@ -258,7 +261,7 @@ this is fully working now, don't redo the setup).
   multi-keyword coverage from all the new sources rather than just the 1-2
   keywords each got smoke-tested with.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
-  `cd ~/Desktop/job-bot && source venv/bin/activate && python dashboard/app.py`
+  `cd ~/Desktop/retiarius && source venv/bin/activate && python dashboard/app.py`
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
   sweep, see live status) and **`/queue`** (the actual job review list with
   all the status/PhD tabs).
@@ -279,7 +282,7 @@ this is fully working now, don't redo the setup).
 
 ## Git / GitHub (fully working, don't redo this)
 
-- Remote: `https://github.com/simondelibero-design/job_bot.git`, private.
+- Remote: `https://github.com/simondelibero-design/retiarius.git`, private.
 - Auth: git's built-in `osxkeychain` credential helper (ships with Xcode's
   git, no Homebrew/`gh` CLI needed). Global `~/.gitconfig` has
   `[credential] helper = osxkeychain`. A PAT was entered once, interactively,
@@ -293,7 +296,7 @@ this is fully working now, don't redo the setup).
   `simondelibero-design/website`) — its credential helper was pointing at a
   `gh` binary in a dead session-scratchpad path from an old Claude session.
   Both repos now share the same working global credential config.
-- To push future job-bot commits: `git add -A`, verify nothing sensitive is
+- To push future retiarius commits: `git add -A`, verify nothing sensitive is
   staged (`git diff --cached --name-only`, check against `.gitignore`'s
   list), commit, `git push`. Should just work.
 
