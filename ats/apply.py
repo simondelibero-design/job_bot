@@ -25,7 +25,7 @@ from ats.lanl import fill_application as fill_lanl
 from ats.ornl import fill_application as fill_ornl
 from ats.slac import fill_application as fill_slac
 from ats.snl import fill_application as fill_snl
-from db.database import set_application_status
+from db.database import set_application_status, update_job_url
 
 HANDLERS = {
     "greenhouse": fill_greenhouse,
@@ -44,19 +44,38 @@ HANDLERS = {
 }
 
 
+def _navigate_and_detect(page, job_id: int, job_url: str) -> str:
+    """Navigates to job_url and detects the ATS platform from wherever the
+    browser actually ends up (`page.url`) rather than the URL we started
+    with. This matters for Indeed/ZipRecruiter jobs: their stored URL is a
+    click-tracking redirect (e.g. Indeed's `/rc/clk?jk=...`), not the real
+    application page, so detect_platform() against it always returns
+    "unknown" even when the job is genuinely hosted on a recognized
+    platform. Playwright's goto() already follows the HTTP redirect chain
+    on its own — this just reads where it landed afterward. If that's a
+    different URL than what we started with, persist it so future views
+    (e.g. the dashboard's "Easy Apply Only" filter) see the real
+    destination instead of the tracking link forever."""
+    page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
+    page.wait_for_timeout(1500)
+    resolved_url = page.url
+    if resolved_url and resolved_url != job_url:
+        update_job_url(job_id, resolved_url)
+    return detect_platform(resolved_url)
+
+
 def prepare_application(job_id: int, job_url: str, resume: dict, headless: bool = True) -> dict:
-    platform = detect_platform(job_url)
-    handler = HANDLERS.get(platform)
-
-    if handler is None:
-        set_application_status(job_id, "needs_review", notes=f"Unknown ATS platform for {job_url}")
-        return {"platform": "unknown", "needs_review": ["Unrecognized ATS — apply manually"]}
-
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
         page = browser.new_page()
-        page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(1500)
+        platform = _navigate_and_detect(page, job_id, job_url)
+        handler = HANDLERS.get(platform)
+
+        if handler is None:
+            browser.close()
+            set_application_status(job_id, "needs_review", notes=f"Unknown ATS platform for {job_url}")
+            return {"platform": "unknown", "needs_review": ["Unrecognized ATS — apply manually"]}
+
         result = handler(page, resume)
         browser.close()
 
@@ -73,14 +92,11 @@ def prepare_and_open(job_id: int, job_url: str, resume: dict):
     from a web server has no interactive terminal to read from. The human
     reviews, solves any CAPTCHA, answers custom questions, and clicks submit
     themselves; this script never does any of that."""
-    platform = detect_platform(job_url)
-    handler = HANDLERS.get(platform)
-
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()
-        page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(1500)
+        platform = _navigate_and_detect(page, job_id, job_url)
+        handler = HANDLERS.get(platform)
 
         if handler:
             result = handler(page, resume)

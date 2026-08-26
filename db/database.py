@@ -140,6 +140,17 @@ def set_application_status(job_id: int, status: str, notes: str | None = None,
         )
 
 
+def update_job_url(job_id: int, url: str):
+    """Overwrites a job's stored URL — used when ats/apply.py's real
+    navigation resolves a discovery-time tracking link (Indeed's
+    /rc/clk?jk=..., which detect_platform() can never identify anything
+    from) to the actual application page it redirects to, so future views
+    (e.g. the dashboard's "Easy Apply Only" filter) see the real
+    destination instead of the tracking link forever."""
+    with get_conn() as conn:
+        conn.execute("UPDATE jobs SET url = ? WHERE id = ?", (url, job_id))
+
+
 def restore_job(job_id: int):
     """Pulls a job out of any excluded bucket (hard exclude, semi_excluded,
     or likely_excluded) and back into the normal queue."""
