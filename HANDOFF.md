@@ -143,6 +143,92 @@ bug — see git history for exact recovery steps if this happens again).
   browser-tested, including a real end-to-end batch-prepare run against a
   live SLAC posting that confirmed the whole pipeline (dashboard → 
   `ats/apply.py` → `ats/slac.py` → DB update) works correctly together.
+- **Dark mode landed** — confirmed, no longer an open question. Both
+  dashboard templates use a coherent dark palette.
+
+## Session 3 (2026-08-26): all 17 DOE national labs, distance-priority UI
+
+- **All 17 DOE national labs now have discovery scrapers**, up from the 9
+  Session 2 built. The 8 new ones (Ames, Jefferson Lab, PPPL, SRNL, NREL,
+  INL, LBNL — 7 real scrapers — plus NETL, which got no scraper) were built
+  across several background agents, same parallel-then-personally-verify
+  workflow as Session 2's original batch. Every one was live-tested through
+  `main.py`'s real `_run_sweep()` before being committed, not just trusted
+  from the agent reports. One real judgment call worth knowing about:
+  `scrapers/inl.py` clears a Cloudflare JS challenge by loading the page
+  with a stock, unmodified Playwright session (no stealth plugins, no
+  fingerprint spoofing, no CAPTCHA-solving) — verified live that this is a
+  transparent capability check any real browser passes with zero
+  interaction, not a targeted anti-automation wall like SmartRecruiters'
+  (which specifically detects and blocks genuine Playwright automation —
+  see `ats/smartrecruiters.py`). Read that file's docstring before assuming
+  this pattern applies elsewhere; it's a case-by-case call, not a blanket
+  "Cloudflare is fine to load through."
+  - `scrapers/ames.py` — no career site of its own; postings live inside
+    Iowa State's single campus-wide Workday tenant with no way to isolate
+    just the lab via facets, so this pages the whole tenant and filters by
+    title text instead.
+  - `scrapers/jlab.py` — same SAP SuccessFactors "Jobs2Web" platform as
+    ORNL, retargeted.
+  - `scrapers/pppl.py` — Princeton-operated (like SLAC is
+    Stanford-operated), runs on an iCIMS tenant (same ATS `ats/icims.py`
+    already has an application handler for, different tenant).
+  - `scrapers/srnl.py` — Battelle-operated like PNNL but a different
+    platform: Oracle Fusion Cloud Recruiting, the same one Stanford runs
+    for SLAC.
+  - `scrapers/nrel.py` — Workday, same CXS API pattern as ANL/BNL/Ames.
+    Notable: NREL's own postings now self-refer internally as "National
+    Laboratory of the Rockies (NLR)," an apparent rebrand in progress —
+    `company` kept as the NREL name for searchability.
+  - `scrapers/inl.py` — Oracle Fusion Cloud Recruiting again (see the
+    Cloudflare note above), self-hosted at careers.inl.gov.
+  - `scrapers/lbnl.py` — no public API at all; a real keyword-filtered
+    listing only exists behind live browser/session state on an old
+    Oracle-hosted talent-community platform, so this is a standard
+    Playwright DOM-scraper (same pattern as `indeed.py`).
+  - **NETL got no scraper — correctly.** Unlike every other lab here it's
+    DOE-operated directly, and its own careers page says outright to use
+    USAJobs for all federal opportunities there. Same honest call as NSF
+    from Session 2 rather than building something redundant.
+- **Dashboard sweep-launcher UI regrouped**: sites are now alphabetized
+  within category, with the 17 labs split into two collapsible `<details>`
+  groups — "National Labs" (the original 9) and "Other National Labs" (the
+  8 added this session) — each with its own select-all checkbox that stays
+  synced if individual sites get toggled by hand. See
+  `dashboard/app.py`'s `GENERAL_SITES` / `NATIONAL_LAB_SITES` /
+  `OTHER_NATIONAL_LAB_SITES`.
+- **Distance-tier sliders added to the home page**, under "Database":
+  close/meh/far/life-change, each with a synced slider + type-in number
+  field (decimals supported throughout), plus a miles/km display toggle
+  (purely client-side conversion — the server and `dashboard/settings.json`
+  always store miles). Saving triggers `matcher/rescore.py` automatically
+  so the whole DB reflects new limits immediately.
+- **Distance-priority pie chart**: a second control, also under
+  "Database," for how much a job's tier should nudge its rank in the
+  queue on top of the career-field relevance score it already needs to
+  clear the exclusion gates — one slider per tier (Close/Meh/Far/
+  Life-change), visualized as a live CSS-conic-gradient pie chart. Went
+  through one earlier wrong design (a single flat 0-100% dial) before
+  landing here — see `matcher/scorer.py`'s `priority_score()` and
+  `config.py`'s `TIER_WEIGHTS` for the final flat-per-tier-bonus
+  implementation. `db/schema.sql`/`db/database.py` gained a new
+  `priority_score` column for this — if you're touching the DB schema
+  again, note the migration had a real ordering bug (index created before
+  the column existed, on pre-existing databases) that got caught and
+  fixed during testing, not after.
+- **New config setting: seniority filter** (`SENIORITY_EXCLUDE_KEYWORDS`
+  in `config.py`) routes titles containing "head"/"lead"/"senior"/"sr"/
+  "chief" into the same `likely_excluded` tab as a bare PhD mention.
+  Known, documented false-positive risk on "lead" (the metal) and "sr"
+  (SR-71, State Route abbreviations) — not silently ignored, flagged in
+  the config comment.
+- **`ats/aps.py`'s covering-message field** is now pre-filled with a
+  fixed, user-chosen line rather than left blank.
+- No PR workflow exists for this project — every commit this whole
+  multi-day session (Session 2 and 3 both) went straight to `main` and was
+  pushed immediately, with the user's continuous visibility and no
+  objection. Don't assume a feature-branch model unless the user asks for
+  one explicitly.
 
 ## What this project is
 
@@ -160,16 +246,16 @@ Location: `~/Desktop/job-bot/`. **Pushed to a private GitHub repo**:
 https://github.com/simondelibero-design/job_bot (see Git section below —
 this is fully working now, don't redo the setup).
 
-## Current real state (verified 2026-08-24, commit `6daa6ac`)
+## Current real state (verified 2026-08-26, commit `13e1310`)
 
-- **3,264 jobs** in `db/jobs.db`: 1,554 local, 1,205 remote, 505 life_change.
-  The 1,057→1,205 remote bump is real postings from smoke-testing each new
-  national-lab/APS scraper end-to-end (1-2 keyword tests each, not full
-  sweeps) — everything else is the original full 99-keyword Indeed+
-  ZipRecruiter sweep from 2026-08-21, not a partial/test run. A real full
-  sweep with all sources enabled hasn't been run yet — worth doing to get
-  proper multi-keyword coverage from all the new sources rather than just
-  the 1-2 keywords each got smoke-tested with.
+- **3,324 jobs** in `db/jobs.db`: 1,554 local, 1,265 remote, 505 life_change.
+  The remote bump across Sessions 2-3 is real postings from smoke-testing
+  each new scraper end-to-end (1-2 keyword tests each, not full sweeps) —
+  everything else is the original full 99-keyword Indeed+ZipRecruiter sweep
+  from 2026-08-21, not a partial/test run. A real full sweep with all 21
+  sources enabled hasn't been run yet — worth doing to get proper
+  multi-keyword coverage from all the new sources rather than just the 1-2
+  keywords each got smoke-tested with.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
   `cd ~/Desktop/job-bot && source venv/bin/activate && python dashboard/app.py`
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
