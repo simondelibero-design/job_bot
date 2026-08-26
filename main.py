@@ -31,6 +31,7 @@ from scrapers.bnl import search_bnl
 from scrapers.boeing import search_boeing
 from scrapers.clearancejobs import search_clearancejobs
 from scrapers.draper import search_draper
+from scrapers.fda import search_fda_orise
 from scrapers.fnal import search_fnal
 from scrapers.general_dynamics import search_general_dynamics
 from scrapers.indeed import search_indeed
@@ -81,7 +82,7 @@ VALID_SITES = {
     "quantinuum", "physicstoday", "physicsworldjobs",
     "ionq", "anduril", "psiquantum", "boeing", "draper", "clearancejobs",
     "northrop_grumman", "lockheed_martin", "general_dynamics", "mitre", "spacex",
-    "rigetti", "atomcomputing",
+    "rigetti", "atomcomputing", "fda_orise",
 }
 
 
@@ -349,6 +350,13 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_atomcomputing(keyword)
             except Exception as e:
                 print(f"  atomcomputing search failed for '{keyword}': {e}")
+
+        if "fda_orise" in sites:
+            print(f"[{mode}][fda_orise] searching: {keyword}")
+            try:
+                found_this_keyword += search_fda_orise(keyword)
+            except Exception as e:
+                print(f"  fda_orise search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(

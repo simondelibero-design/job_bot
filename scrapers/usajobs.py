@@ -10,11 +10,9 @@ ZipRecruiter session files):
 The user_agent must be the email you registered with — USAJobs requires it
 verbatim as a request header, not a browser string.
 
-This module has NOT been tested against a live key (none was available while
-building it) — the request shape and response field names come from
-USAJobs' own documentation, but should be verified against a real response
-before being trusted. If something breaks, the first thing to check is
-whether MatchedObjectDescriptor's field names match what's assumed below.
+Verified live 2026-08-26 against a real key (NIST/NRC/FCC/FDA agency-
+coverage investigation, see HANDOFF.md Session 5): clean 200s, real current
+postings, MatchedObjectDescriptor's field names match what's assumed below.
 """
 import json
 import re

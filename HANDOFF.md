@@ -333,6 +333,73 @@ bug — see git history for exact recovery steps if this happens again).
   this is the load-bearing entry to read before touching anything
   Indeed/ZipRecruiter-adjacent again.
 
+## Session 5 (2026-08-26): NIST/NRC/FCC/FDA investigated — one real gap found (FDA ORISE)
+
+Investigated whether NIST, NRC (Nuclear Regulatory Commission), FCC, and FDA
+(medical-device review side) need dedicated discovery scrapers, given
+`scrapers/usajobs.py` already covers all federal agencies. Queried
+`search_usajobs()` live against a real key for each agency (confirms the
+module's stale "not tested against a live key" docstring note is now
+outdated — it works cleanly) and checked each agency's own careers page.
+
+- **NIST: fully covered by USAJobs, no scraper.** Live query for "NIST"
+  returned 25 solid current results (AI Standards Coordinator, Semiconductor
+  Characterization Engineer, etc). nist.gov/careers points exclusively at
+  USAJobs, no mention of any other route. One genuine non-USAJobs channel
+  does exist — the NIST/NRC (National Research Council, i.e. National
+  Academies — NOT the Nuclear Regulatory Commission) Postdoctoral Research
+  Associateship Program, 688 live listings at
+  `ofell.nas.edu/raplab10/opportunity/opportunities.aspx?LabCode=50`, plain
+  scrapable HTML, no bot wall — but every opportunity there is restricted to
+  Postdoctoral applicants only, not a fit for Simon's current B.S.-candidate
+  stage, so no scraper was built for it. Worth revisiting post-PhD.
+- **NRC: fully covered by USAJobs, no scraper.** Live query for "NRC" /
+  "nuclear regulatory" returned 25 current results each (Senior Resident
+  Inspector, Attorney, Senior Rulemaking Project Manager, etc — real,
+  current NRC postings). nrc.gov 403s on every path tried, even with a
+  normal browser UA (real bot-wall, not evaded — see hard rule) — verdict
+  instead confirmed via indexed page text: "NRCareers is integrated with
+  USAJOBS... You can view a list of current NRC vacancies at USAJOBS," and
+  the seasonal Nuclear Safety Professional Development Program appears to
+  hire through the same channel.
+- **FCC: fully covered by USAJobs, no scraper.** Live query for "FCC"
+  returned 25 current results (Electronics Engineer, Attorney Advisor,
+  etc). fcc.gov also 403s on every path (same real bot-wall, not evaded);
+  indexed text confirms "FCCJobs is now integrated with USAJobs" and that
+  the Honors STEM Program posts "on USAJOBS as part of the Pathways Recent
+  Graduate Program."
+- **FDA: mostly covered by USAJobs, but one real gap found and scraped.**
+  Regular FDA staff jobs (including CDRH-adjacent roles like Supervisory
+  Biomedical Engineer) are on USAJobs already. But FDA's own site is
+  explicit that its Student/Fellowship/Senior-Scientist programs — run
+  through ORISE (Oak Ridge Institute for Science and Education), a
+  non-competitive-service, stipend-based track — are a separate hiring
+  mechanism that never touches USAJobs (confirmed live: USAJobs query for
+  "medical device reviewer" returns 0 results). `scrapers/fda.py` fills
+  this gap: calls the public Zintellect catalog API
+  (`zintellect.com/Public/Opportunity/ORISECatalog?Organization=U.S.+Food+and+Drug+Administration`)
+  that FDA's own ORISE page (orise.orau.gov/fda/) calls client-side — no
+  bot detection on either host, robots.txt checked on both (clean). Live
+  pull: 84 current opportunities, ~30% CDRH medical-device fellowships
+  (Ophthalmic Devices, Cardiovascular Devices, AI/ML medical-device
+  validation, etc). Not purely PhD-gated like NIST's program — some
+  listings are open to Post-Bachelor's/Undergraduate applicants, genuinely
+  relevant to Simon's stage. Checked whether NIST/NRC/FCC have the same
+  kind of dedicated ORISE portal FDA does
+  (`orise.orau.gov/{nist,nrc,fcc}/`) — all three 302 to ORISE's generic
+  404, confirming none of them run one. See `scrapers/fda.py`'s docstring
+  for the full technical writeup.
+- **Keyword recommendations for `config.py`'s `SEARCH_KEYWORDS`** (not
+  applied — config.py is off-limits for this investigation, left for a
+  human/separate session to add): "NIST" and "medical device reviewer" /
+  "regulatory affairs" for FDA/CDRH-flavored roles surfaced better by
+  neither of the two current adjacent entries ("metrology technician",
+  "calibration technician") nor "biomedical engineer" alone. NRC and FCC
+  didn't need new entries — "nuclear engineer" and "RF engineer" (already
+  in the list) already surface their postings well; a bare "NRC" is too
+  short/ambiguous to add safely (collides with the National Research
+  Council usage above and with unrelated "Nrc" substrings).
+
 ## Next up (planned 2026-08-26, not started — pick up here)
 
 Two new dashboard sub-pages, requested but explicitly deferred until a
