@@ -25,7 +25,7 @@ SWEEP_LOCK_PATH = Path(__file__).parent / ".sweep_lock.json"
 # later ("Other National Labs") — see HANDOFF.md for which session added
 # which. New lab sources should get added to OTHER_NATIONAL_LAB_SITES
 # (alphabetized) rather than the first group, to keep that history legible.
-GENERAL_SITES = ["aps", "indeed", "physicstoday", "physicsworldjobs", "usajobs", "ziprecruiter"]
+GENERAL_SITES = ["aps", "clearancejobs", "indeed", "physicstoday", "physicsworldjobs", "usajobs", "ziprecruiter"]
 NATIONAL_LAB_SITES = ["anl", "bnl", "fnal", "lanl", "llnl", "ornl", "pnnl", "slac", "snl"]
 OTHER_NATIONAL_LAB_SITES = ["ames", "inl", "jlab", "lbnl", "nrel", "pppl", "srnl"]
 # Individual employers (aerospace/defense/quantum-computing companies, etc.)

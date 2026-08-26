@@ -28,6 +28,7 @@ from scrapers.anl import search_anl
 from scrapers.aps import search_aps
 from scrapers.bnl import search_bnl
 from scrapers.boeing import search_boeing
+from scrapers.clearancejobs import search_clearancejobs
 from scrapers.draper import search_draper
 from scrapers.fnal import search_fnal
 from scrapers.indeed import search_indeed
@@ -71,7 +72,7 @@ VALID_SITES = {
     "pnnl", "anl", "fnal", "llnl", "lanl", "bnl", "slac", "ornl", "snl",
     "ames", "jlab", "pppl", "srnl", "nrel", "inl", "lbnl",
     "quantinuum", "physicstoday", "physicsworldjobs",
-    "ionq", "anduril", "psiquantum", "boeing", "draper",
+    "ionq", "anduril", "psiquantum", "boeing", "draper", "clearancejobs",
 }
 
 
@@ -283,6 +284,13 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_draper(keyword)
             except Exception as e:
                 print(f"  draper search failed for '{keyword}': {e}")
+
+        if "clearancejobs" in sites:
+            print(f"[{mode}][clearancejobs] searching: {keyword}")
+            try:
+                found_this_keyword += search_clearancejobs(keyword, location_query, radius)
+            except Exception as e:
+                print(f"  clearancejobs search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(
