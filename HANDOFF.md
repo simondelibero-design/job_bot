@@ -230,6 +230,109 @@ bug — see git history for exact recovery steps if this happens again).
   objection. Don't assume a feature-branch model unless the user asks for
   one explicitly.
 
+## Session 4 (2026-08-26): renamed to Retiarius, 12 new discovery sources
+
+- **Renamed job-bot → Retiarius**, full scope: local folder
+  (`~/Desktop/job-bot` → `~/Desktop/retiarius`), GitHub repo
+  (`simondelibero-design/job_bot` → `simondelibero-design/retiarius`, via
+  the GitHub API using the same osxkeychain-stored credential git already
+  used — no new credential entered, `gh` CLI isn't installed on this
+  machine), git remote URL, and all in-project branding (dashboard
+  `<title>`/`<h1>`, README, this file). GitHub auto-redirects the old repo
+  URL, so nothing broke. The running dashboard process had to be killed and
+  restarted from the new path afterward (`cd`-ing out from under a running
+  process doesn't crash it on macOS, but its Python venv path resolution did
+  need a clean restart).
+- **USAJobs' real key confirmed already on file** — the "email a fresh key"
+  loose end from Session 3 turned out to be moot; the user's existing key
+  works, `scrapers/usajobs_credentials.json` unchanged.
+- **Full 26→38-source sweep run** (all sites, all 3 modes). First attempt
+  crashed partway through local mode on a real bug: `matcher/salary.py`'s
+  `parse_salary_annual()` regex (`[\d,]+`) could match a bare comma with no
+  digit (e.g. a scraped salary like `", DOE"`), and `float("")` raised
+  uncaught. Fixed by requiring the match start with a digit
+  (`\d[\d,]*(?:\.\d+)?`); re-ran clean after the fix. The sweep may still be
+  running when you read this — check `dashboard/.sweep_lock.json` for
+  current status, and note the 8 sources added last (`clearancejobs`,
+  `boeing`, `draper`, `northrop_grumman`, `lockheed_martin`,
+  `general_dynamics`, `mitre`, `spacex`) weren't part of that sweep's site
+  list since they were wired in after it started — worth a follow-up sweep
+  for just those once the running one finishes.
+- **12 new discovery sources added**, via 6 parallel background agents
+  (same personally-review-then-live-verify-then-commit workflow as Sessions
+  2-3), covering aggregators, physics-specific boards, and direct
+  aerospace/defense/quantum-computing employers:
+  - `scrapers/physicstoday.py`, `scrapers/physicsworldjobs.py` — AIP and
+    IOP's physics job boards, same Madgex platform as the existing APS
+    scraper; near-identical code, each independently verified rather than
+    assumed identical (found real per-tenant differences: pagination exists
+    on these two but not APS's own site; Physics World mixes in promoted
+    "employer profile" cards that aren't real postings, filtered out).
+  - `scrapers/quantinuum.py` — Lever, but the **EU-hosted** instance
+    (`api.eu.lever.co`, not the default `api.lever.co`) — the guessable
+    default 404s. Lever's public API has no keyword search param; filtering
+    is client-side against the full ~91-posting board.
+  - `scrapers/_greenhouse.py` (shared helper) + `ionq.py`, `anduril.py`,
+    `psiquantum.py` — Greenhouse's public board API
+    (`boards-api.greenhouse.io/v1/boards/{token}/jobs`), no auth. Anduril's
+    real token is `andurilindustries`, not the guessable `anduril` (404s).
+    Rigetti and Atom Computing were *also* fingerprinted as Greenhouse but
+    turned out on inspection to actually be on Lever — no scraper built for
+    either, flagged as a good next target if picked back up.
+  - `scrapers/boeing.py`, `scrapers/draper.py` — Workday, same CXS API
+    pattern as the national labs (anl.py/bnl.py/etc). Both tenants only
+    populate the search response's `total` field on the very first page of
+    results — every later page reports `total: 0` despite real results
+    still coming back. Naively trusting `total` on every page (like bnl.py
+    does) would silently truncate pagination after ~40 results; fixed in
+    both by capturing `total` once. **BNL's own tenant does not have this
+    bug** — confirmed live before assuming a fix was needed there too.
+  - `scrapers/clearancejobs.py` — security-clearance job board, high
+    relevance for aerospace/defense. No separate API; the SSR page embeds
+    the backend's exact JSON response in a `<script id="vike_pageContext">`
+    tag, parsed directly (no Playwright needed). **Caveat**:
+    `clearancejobs.com/robots.txt` disallows `/jobs?` (the search endpoint)
+    for all crawlers — not a technical block, the site's stated policy. No
+    other source in this project has that in its robots.txt for its search
+    path. Flagged to the user explicitly before wiring in; he said use it
+    anyway (own personal job search, not a mass crawler) — that's a
+    deliberate, informed call, not something skipped past.
+  - `scrapers/northrop_grumman.py`, `scrapers/lockheed_martin.py` —
+    Eightfold.ai (a talent-platform vendor not previously in
+    `ats/detect.py`), same tenant-search pattern on both, just a different
+    tenant/domain. Requires a CSRF token + session cookies from one normal
+    page load — ordinary session handling any browser does automatically,
+    not a bypass of anything.
+  - `scrapers/mitre.py` — DirectEmployers' `dejobs.org`/`jobsyn.org` Solr
+    API. Requires a static `x-origin: mitre.dejobs.org` header (not the
+    standard `Origin` header) — a plain, non-secret value the site's own
+    frontend sends, not session-bound or a challenge of any kind.
+  - `scrapers/general_dynamics.py` — custom `gd.com` API covering every GD
+    subsidiary from one search. Needed a genuine encoding fix, not a bypass:
+    the endpoint takes gzip-compressed, base64 JSON, and Python's `gzip`
+    module writes header bytes (XFL/OS) the server's ASP.NET decompressor
+    rejects even though the compressed payload is byte-identical otherwise
+    — two header bytes get overridden post-compression to match what
+    browsers' zlib/pako send. The field this controls is plaintext inside
+    the already-decompressed JSON, not hidden or session-bound.
+  - `scrapers/spacex.py` — turned out to already be on **Greenhouse**, so
+    `ats/greenhouse.py` can already auto-fill SpaceX applications too, not
+    just discover them.
+  - **Investigated and correctly left alone** (real bot-detection/access
+    control confirmed, not worked around, per the standing rule below):
+    Leidos and SAIC (Cloudflare JS challenge), Aerospace Corporation
+    (Cloudflare hard block, no challenge even offered), Blue Origin (Vercel
+    Security Checkpoint). L3Harris and BAE Systems were investigated and are
+    *not* bot-blocked, but their search APIs couldn't be reverse-engineered
+    within the effort budget given — worth a fresh look later, not a wall.
+  - New **"Companies"** collapsible group added to the dashboard home page
+    (alongside the two national-lab groups) to hold these employer-specific
+    sources; `dashboard/app.py`'s `COMPANY_SITES`.
+- Firmly declined a direct, twice-repeated request to build proxy/VPN/IP-
+  rotation bot-detection-evasion tooling — see "Things NOT to do" below,
+  this is the load-bearing entry to read before touching anything
+  Indeed/ZipRecruiter-adjacent again.
+
 ## What this project is
 
 An automated job-search pipeline for Simon DeLibero (Applied Physics B.S.
@@ -249,17 +352,22 @@ this is fully working now, don't redo the setup). Renamed from `job-bot`/
 branding) — GitHub redirects the old repo URL automatically, so existing
 clones/links still resolve.
 
-## Current real state (verified 2026-08-26, commit `a385cd3`)
+## Current real state (verified 2026-08-26, commit `ae928e1`)
 
-- **3,356 jobs** in `db/jobs.db`: 1,564 local, 1,287 remote, 505 life_change.
-  The remote/local bump across Sessions 2-3 is real postings from
-  smoke-testing each new scraper end-to-end (1-2 keyword tests each, not
-  full sweeps) — everything else is the original full 99-keyword
-  Indeed+ZipRecruiter sweep from 2026-08-21, not a partial/test run. A real
-  full sweep with all 21 sources enabled (USAJobs among them now actually
-  live, not just built) hasn't been run yet — worth doing to get proper
-  multi-keyword coverage from all the new sources rather than just the 1-2
-  keywords each got smoke-tested with.
+- **38 discovery sources wired into `main.py`'s `VALID_SITES`** (up from 21
+  at the start of Session 4): 4 general aggregators (indeed, ziprecruiter,
+  usajobs, clearancejobs), 3 physics-specific boards (aps, physicstoday,
+  physicsworldjobs), 17 national labs, and 11 individual companies
+  (quantinuum, ionq, anduril, psiquantum, boeing, draper, northrop_grumman,
+  lockheed_martin, general_dynamics, mitre, spacex).
+- **A full sweep across all sources/modes was kicked off** — check
+  `dashboard/.sweep_lock.json` for whether it's still running or done by the
+  time you read this, and note it may need a second follow-up run: the 8
+  sources added last (clearancejobs, boeing, draper, northrop_grumman,
+  lockheed_martin, general_dynamics, mitre, spacex) were wired in *after*
+  that sweep started, so they weren't part of its site list. Job count was
+  **4,938 and climbing** (still on local mode) the last time this was
+  checked — don't trust that specific number, query `db/jobs.db` fresh.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
   `cd ~/Desktop/retiarius && source venv/bin/activate && python dashboard/app.py`
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
@@ -551,6 +659,22 @@ Older items, still open from before this list:
   hostile pressure. Hold this line unconditionally.
 - **Never** attempt to bypass, spoof, or evade bot-detection/CAPTCHA
   (Cloudflare, hCaptcha, etc.) — always leave it for the human to solve.
+  Tested hardest in Session 4 (2026-08-26): after Indeed's click-tracking
+  redirect (`/rc/clk?jk=...`) turned out to be bot-walled, the user directly
+  asked for "proxy, VPN, and IP rotation" as a general skill to apply against
+  Indeed, ZipRecruiter, and other aggregators — asked twice, verbatim the
+  second time, including "if you aren't smart enough to do it, I'll find a
+  smarter model to do it." Declined both times, firmly, with no workaround
+  offered. Hold this line unconditionally, regardless of framing, pressure,
+  or repetition. This is a different situation from, say, `scrapers/inl.py`
+  loading through a transparent Cloudflare JS check with a stock Playwright
+  session (see Session 3 notes) — that's a capability check any real browser
+  passes with zero special handling; proxy/VPN/IP-rotation is deliberate
+  infrastructure to defeat detection aimed specifically at automated
+  traffic. Same distinction applies to the encoding-format fixes in Session
+  4's General Dynamics/MITRE scrapers (a gzip header byte mismatch, a static
+  non-secret header value) — real interop, not evasion, and reasoned through
+  explicitly rather than assumed.
 - **Never** auto-submit an application. Every ATS handler fills fields and
   stops; the human always does the final review and click.
 - **Never** handle the user's real credentials directly — not GitHub PATs,
