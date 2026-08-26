@@ -31,6 +31,7 @@ from scrapers.indeed import search_indeed
 from scrapers.jlab import search_jlab
 from scrapers.lanl import search_lanl
 from scrapers.llnl import search_llnl
+from scrapers.nrel import search_nrel
 from scrapers.ornl import search_ornl
 from scrapers.pnnl import search_pnnl
 from scrapers.pppl import search_pppl
@@ -58,7 +59,7 @@ def _zip_auth_kwargs() -> dict:
 VALID_SITES = {
     "indeed", "ziprecruiter", "usajobs", "aps",
     "pnnl", "anl", "fnal", "llnl", "lanl", "bnl", "slac", "ornl", "snl",
-    "ames", "jlab", "pppl", "srnl",
+    "ames", "jlab", "pppl", "srnl", "nrel",
 }
 
 
@@ -193,6 +194,13 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_srnl(keyword)
             except Exception as e:
                 print(f"  srnl search failed for '{keyword}': {e}")
+
+        if "nrel" in sites:
+            print(f"[{mode}][nrel] searching: {keyword}")
+            try:
+                found_this_keyword += search_nrel(keyword)
+            except Exception as e:
+                print(f"  nrel search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(

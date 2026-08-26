@@ -26,7 +26,7 @@ SWEEP_LOCK_PATH = Path(__file__).parent / ".sweep_lock.json"
 # (alphabetized) rather than the first group, to keep that history legible.
 GENERAL_SITES = ["aps", "indeed", "usajobs", "ziprecruiter"]
 NATIONAL_LAB_SITES = ["anl", "bnl", "fnal", "lanl", "llnl", "ornl", "pnnl", "slac", "snl"]
-OTHER_NATIONAL_LAB_SITES = ["ames", "jlab", "pppl", "srnl"]
+OTHER_NATIONAL_LAB_SITES = ["ames", "jlab", "nrel", "pppl", "srnl"]
 VALID_SITES = GENERAL_SITES + NATIONAL_LAB_SITES + OTHER_NATIONAL_LAB_SITES
 VALID_MODES = ["local", "remote", "life_change"]
 STATUS_TABS = [
