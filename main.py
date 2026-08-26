@@ -26,6 +26,7 @@ from scrapers.ames import search_ames
 from scrapers.anduril import search_anduril
 from scrapers.anl import search_anl
 from scrapers.aps import search_aps
+from scrapers.atomcomputing import search_atomcomputing
 from scrapers.bnl import search_bnl
 from scrapers.boeing import search_boeing
 from scrapers.clearancejobs import search_clearancejobs
@@ -50,6 +51,7 @@ from scrapers.physicsworldjobs import search_physicsworldjobs
 from scrapers.pppl import search_pppl
 from scrapers.psiquantum import search_psiquantum
 from scrapers.quantinuum import search_quantinuum
+from scrapers.rigetti import search_rigetti
 from scrapers.slac import search_slac
 from scrapers.snl import search_snl
 from scrapers.spacex import search_spacex
@@ -79,6 +81,7 @@ VALID_SITES = {
     "quantinuum", "physicstoday", "physicsworldjobs",
     "ionq", "anduril", "psiquantum", "boeing", "draper", "clearancejobs",
     "northrop_grumman", "lockheed_martin", "general_dynamics", "mitre", "spacex",
+    "rigetti", "atomcomputing",
 }
 
 
@@ -332,6 +335,20 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_spacex(keyword)
             except Exception as e:
                 print(f"  spacex search failed for '{keyword}': {e}")
+
+        if "rigetti" in sites:
+            print(f"[{mode}][rigetti] searching: {keyword}")
+            try:
+                found_this_keyword += search_rigetti(keyword)
+            except Exception as e:
+                print(f"  rigetti search failed for '{keyword}': {e}")
+
+        if "atomcomputing" in sites:
+            print(f"[{mode}][atomcomputing] searching: {keyword}")
+            try:
+                found_this_keyword += search_atomcomputing(keyword)
+            except Exception as e:
+                print(f"  atomcomputing search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(

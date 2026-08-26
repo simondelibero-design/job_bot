@@ -33,9 +33,9 @@ OTHER_NATIONAL_LAB_SITES = ["ames", "inl", "jlab", "lbnl", "nrel", "pppl", "srnl
 # home page, alphabetized, for the same legibility reason as the two
 # national-lab groups above.
 COMPANY_SITES = [
-    "anduril", "boeing", "draper", "general_dynamics", "ionq",
-    "lockheed_martin", "mitre", "northrop_grumman", "psiquantum",
-    "quantinuum", "spacex",
+    "anduril", "atomcomputing", "boeing", "draper", "general_dynamics",
+    "ionq", "lockheed_martin", "mitre", "northrop_grumman", "psiquantum",
+    "quantinuum", "rigetti", "spacex",
 ]
 VALID_SITES = GENERAL_SITES + NATIONAL_LAB_SITES + OTHER_NATIONAL_LAB_SITES + COMPANY_SITES
 VALID_MODES = ["local", "remote", "life_change"]
