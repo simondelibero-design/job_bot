@@ -9,7 +9,17 @@ PLATFORM_PATTERNS = {
     "jazzhr": re.compile(r"\.applytojob\.com", re.I),
     "smartrecruiters": re.compile(r"\.smartrecruiters\.com", re.I),
     "taleo": re.compile(r"\.taleo\.net", re.I),
-    "successfactors": re.compile(r"\.successfactors\.(com|eu)", re.I),
+    "successfactors": re.compile(
+        r"\.successfactors\.(com|eu)"
+        # Several SuccessFactors "Jobs2Web" tenants front the platform with
+        # their own branded domain rather than the raw successfactors.com
+        # host — same situation ornl/lanl/slac/snl below needed one-off
+        # patterns for. Confirmed live 2026-08-26 via scrapers/corning.py,
+        # halliburton.py, oxford_instruments.py, stratasys.py.
+        r"|corningjobs\.corning\.com|jobs\.halliburton\.com"
+        r"|jobs\.oxinst\.com|careers\.stratasys\.com",
+        re.I,
+    ),
     "aps": re.compile(r"apsphysicsjobs\.com", re.I),
     "lanl": re.compile(r"lanl\.jobs", re.I),
     "ornl": re.compile(r"jobs\.ornl\.gov", re.I),
