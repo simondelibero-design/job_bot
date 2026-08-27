@@ -13,6 +13,18 @@ PLATFORM_PATTERNS = {
     # a label — see that module's docstring.
     "greenhouse": re.compile(r"(boards|job-boards)\.greenhouse\.io|[?&]gh_jid=", re.I),
     "lever": re.compile(r"jobs\.lever\.co", re.I),
+    # Eightfold.ai has no single universal host — most tenants front it with
+    # their own branded domain rather than the default `{tenant}.eightfold.ai`
+    # subdomain (only Lockheed Martin's checked here uses that default; see
+    # scrapers/_eightfold.py for how these were originally fingerprinted via
+    # page markers, not the URL). List each known tenant's domain explicitly,
+    # same one-off approach as the successfactors branded-domain entries
+    # below — add new ones here as they're found.
+    "eightfold": re.compile(
+        r"\.eightfold\.ai|jobs\.northropgrumman\.com"
+        r"|careers\.appliedmaterials\.com|careers\.gf\.com",
+        re.I,
+    ),
     "workday": re.compile(r"\.myworkdayjobs\.com", re.I),
     "icims": re.compile(r"\.icims\.com", re.I),
     "jazzhr": re.compile(r"\.applytojob\.com", re.I),
@@ -79,6 +91,15 @@ def detect_platform(url: str) -> str:
 # no account-creation/sign-in gate anywhere in the path, and neither has a
 # CAPTCHA blocking the fields themselves (Ashby's invisible reCAPTCHA only
 # fires on submit; Teamtailor's test posting had no CAPTCHA at all).
+#
+# eightfold is deliberately NOT included even though ats/eightfold.py can
+# fill two of the four known tenants completely: this platform's gate is
+# genuinely tenant-dependent, not a fixed platform-wide answer the way
+# every other entry here is — Applied Materials and Lockheed Martin have
+# no gate at all, but Northrop Grumman and GlobalFoundries have the same
+# account-creation wall as Workday. Marking the whole platform "easy
+# apply" would be actively misleading for the gated half. See
+# ats/eightfold.py's docstring for the full tenant-by-tenant breakdown.
 EASY_APPLY_PLATFORMS = {"greenhouse", "lever", "jazzhr", "aps", "ashby", "teamtailor"}
 
 
