@@ -131,16 +131,72 @@ def prepare_and_open(job_id: int, job_url: str, resume: dict):
             notes = "; ".join(needs_review) if needs_review else "Auto-filled, ready to review"
         else:
             notes = f"Unrecognized ATS platform — fill out manually ({job_url})"
-            needs_review = None
+            needs_review = ["No known ATS platform detected on this page — nothing was auto-filled. Fill out and submit manually."]
 
         set_application_status(job_id, "needs_review", ats_platform=platform, notes=notes,
                                 needs_review=needs_review)
+
+        # The needs_review list only ever used to reach the database — the
+        # human looking at THIS actual window had no way to see it without
+        # alt-tabbing to the dashboard, which is easy to miss entirely.
+        # Inject it directly onto the page as a visible on-screen banner
+        # instead. Purely a visual overlay (no page fields touched, nothing
+        # submitted) — safe to inject even for an unrecognized platform.
+        _inject_review_banner(page, platform, needs_review)
 
         try:
             page.wait_for_event("close", timeout=0)
         except Exception:
             pass
         browser.close()
+
+
+def _inject_review_banner(page, platform: str, needs_review: list[str] | None):
+    """Injects a fixed-position overlay directly onto the visible page
+    listing what this handler couldn't fill in — pure DOM/CSS added to
+    `document.body` via page.evaluate(), doesn't touch any form field or
+    the iframe a platform like Greenhouse renders its form inside, and
+    can't submit anything. Collapsed to a small badge by default (a full
+    list permanently covering the page would just get in the way); click
+    it to expand. Injected on the *top-level* page even when the actual
+    form lives in a cross-origin iframe, so it stays visible regardless of
+    where the fields it's describing actually are."""
+    import json
+
+    items = needs_review or []
+    payload = json.dumps({"platform": platform, "items": items})
+    page.evaluate(
+        """(data) => {
+            const items = data.items;
+            const box = document.createElement('div');
+            box.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;'
+                + 'font-family:-apple-system,sans-serif;font-size:13px;max-width:360px;'
+                + 'box-shadow:0 2px 12px rgba(0,0,0,.35);';
+            const badgeColor = items.length ? '#c0392b' : '#1e8449';
+            const badgeText = items.length
+                ? `⚠ ${items.length} item${items.length === 1 ? '' : 's'} need your input`
+                : '✓ Auto-filled, ready to review';
+            box.innerHTML = `
+                <div id="__retiarius_badge" style="background:${badgeColor};color:#fff;padding:8px 14px;`
+                    + `border-radius:8px;cursor:pointer;font-weight:600;">${badgeText}</div>
+                <div id="__retiarius_panel" style="display:none;background:#1f212a;color:#eaeaef;`
+                    + `border:1px solid #33353f;border-radius:8px;margin-top:8px;padding:12px 14px;`
+                    + `max-height:50vh;overflow-y:auto;">
+                    <div style="font-weight:600;margin-bottom:8px;">Retiarius — platform: ${data.platform}</div>
+                    ${items.length
+                        ? '<ul style="margin:0;padding-left:18px;">'
+                            + items.map(i => `<li style="margin-bottom:6px;">${i.replace(/</g, '&lt;')}</li>`).join('')
+                            + '</ul>'
+                        : '<div>Nothing flagged — review the filled fields, then submit yourself.</div>'}
+                </div>`;
+            document.body.appendChild(box);
+            document.getElementById('__retiarius_badge').addEventListener('click', () => {
+                const panel = document.getElementById('__retiarius_panel');
+                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            });
+        }""",
+        json.loads(payload),
+    )
 
 
 if __name__ == "__main__":

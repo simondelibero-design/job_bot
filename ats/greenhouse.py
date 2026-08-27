@@ -99,8 +99,18 @@ def fill_application(page: Page, resume: dict) -> dict:
 
     resume_pdf = resume.get("resume_pdf_path")
     resume_input = ctx.query_selector("#resume")
+    resume_uploaded = False
     if resume_input and resume_pdf:
         resume_input.set_input_files(resume_pdf)
+        resume_uploaded = True
+        # On some tenants (confirmed live 2026-08-27 on PsiQuantum) the
+        # #resume node gets swapped out for a "file attached" widget right
+        # after a successful upload, and whatever replaces it can still
+        # carry aria-required="true" with no id in `known_ids` below — that
+        # produced a false "Resume/CV*" needs_review entry even though the
+        # upload genuinely succeeded (verified separately: the filename
+        # shows up in the rendered page). Filtered out by label text below
+        # now that upload success is tracked explicitly.
 
     # Anything else required on the form is a per-posting custom question
     # (or an EEO/demographic dropdown) — surface it instead of guessing.
@@ -112,6 +122,8 @@ def fill_application(page: Page, resume: dict) -> dict:
         if el_id in known_ids:
             continue
         label = _label_for(ctx, el)
+        if resume_uploaded and label and "resume" in label.lower():
+            continue  # see resume_uploaded note above — a real upload, not a real gap
         if el.get_attribute("role") == "combobox":
             label = f"{label or el_id} (dropdown/combobox — needs a real selection, not just typed text)"
         unanswered.append(label or f"(unlabeled field: {el_id or el.get_attribute('name')})")
@@ -153,5 +165,18 @@ def _label_for(ctx, el) -> str | None:
     container = el.evaluate_handle("el => el.closest('div')")
     if container:
         text = container.as_element().text_content()
-        return text.strip()[:120] if text else None
+        if not text:
+            return None
+        text = text.strip()
+        # The container-div fallback can sweep up an entire file-upload
+        # widget's button cluster (confirmed live 2026-08-27 on PsiQuantum's
+        # Cover Letter field: "Cover Letter*AttachAttachDropboxEnter
+        # manually...") when there's no cleaner label association — keep
+        # just the heading text before the first upload-button word, which
+        # is the actual field name.
+        for marker in ("Attach", "Dropbox"):
+            idx = text.find(marker)
+            if idx > 0:
+                text = text[:idx]
+        return text.strip()[:120] or None
     return None
