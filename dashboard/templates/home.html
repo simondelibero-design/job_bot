@@ -62,6 +62,12 @@
     border-radius: 6px; padding: 4px 6px; font-size: 13px;
   }
   .dist-row .unit { font-size: 12px; color: var(--muted); width: 28px; }
+  .dist-tier-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .lock-toggle {
+    background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    font-size: 16px; line-height: 1; padding: 4px 8px; color: var(--muted);
+  }
+  .lock-toggle:hover { border-color: var(--accent); color: var(--text); }
   .dist-hint { font-size: 12px; color: var(--muted); margin: -4px 0 14px; }
   .unit-toggle { display: flex; gap: 14px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
   .unit-toggle label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
@@ -96,11 +102,15 @@
       <div class="stat-row"><span>Life change</span><span class="n">{{ by_mode.get('life_change', 0) }}</span></div>
 
       <div class="distance-settings">
-        <h3>Distance tiers (outer limit, miles)</h3>
+        <div class="dist-tier-header">
+          <h3>Distance tiers (outer limit, miles)</h3>
+          <button type="button" class="lock-toggle" id="dist-lock-toggle" onclick="toggleDistLock()"></button>
+        </div>
         <div class="dist-hint">
-          How far a job can be and still count as "close"/"meh"/"far" for the local sweep,
+          How far a job can be and still count as "close"/"medium far"/"far" for the local sweep,
           plus the search radius used for the life-change sweep. Saving re-scores every job
-          already in the database against the new limits.
+          already in the database against the new limits. Locked by default so a stray drag
+          doesn't accidentally trigger a re-score — click the lock to edit.
         </div>
         <div class="unit-toggle">
           <label><input type="radio" name="_display_unit" value="mi" checked onchange="setDistUnit('mi')"> Miles</label>
@@ -108,7 +118,7 @@
         </div>
         <form method="post" action="{{ url_for('save_distance_settings') }}" id="distance-form">
           {% for key, label in [
-            ('close_max_miles', 'Close'), ('mid_max_miles', 'Meh'),
+            ('close_max_miles', 'Close'), ('mid_max_miles', 'Medium Far'),
             ('far_max_miles', 'Far'), ('life_change_radius_miles', 'Life-change'),
           ] %}
           <div class="dist-row">
@@ -134,7 +144,7 @@
               <div class="pie-wrap"><div class="pie" id="priority-pie"></div></div>
               <div class="weight-sliders">
                 {% for key, label, color in [
-                  ('close_weight', 'Close', 'var(--accent)'), ('mid_weight', 'Meh', 'var(--good)'),
+                  ('close_weight', 'Close', 'var(--accent)'), ('mid_weight', 'Medium Far', 'var(--good)'),
                   ('far_weight', 'Far', 'var(--warn)'), ('life_change_weight', 'Life-change', 'var(--purple)'),
                 ] %}
                 <div class="dist-row weight-slider-row">
@@ -386,6 +396,29 @@
   DIST_KEYS.forEach(function(key) {
     milesValues[key] = parseFloat(document.getElementById(key + '_num').value) || 0;
   });
+
+  // Locked by default — the miles sliders/number fields and the mi/km
+  // toggle are disabled until unlocked, so a stray drag can't accidentally
+  // change a limit and trigger a re-score of the whole database. Purely a
+  // client-side safeguard; the actual save still requires clicking
+  // "Save & Re-score" either way.
+  var distLocked = true;
+  function applyDistLock() {
+    document.querySelectorAll('#distance-form .dist-input').forEach(function(el) {
+      el.disabled = distLocked;
+    });
+    document.querySelectorAll('input[name="_display_unit"]').forEach(function(el) {
+      el.disabled = distLocked;
+    });
+    var btn = document.getElementById('dist-lock-toggle');
+    btn.textContent = distLocked ? '🔒' : '🔓';
+    btn.title = distLocked ? 'Locked — click to edit distance tiers' : 'Unlocked — click to lock again';
+  }
+  window.toggleDistLock = function() {
+    distLocked = !distLocked;
+    applyDistLock();
+  };
+  applyDistLock();
 
   function round1(n) { return Math.round(n * 10) / 10; }
 
