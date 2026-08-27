@@ -25,6 +25,8 @@ from ats.lanl import fill_application as fill_lanl
 from ats.ornl import fill_application as fill_ornl
 from ats.slac import fill_application as fill_slac
 from ats.snl import fill_application as fill_snl
+from ats.ashby import fill_application as fill_ashby
+from ats.teamtailor import fill_application as fill_teamtailor
 from db.database import set_application_status, update_job_url
 
 HANDLERS = {
@@ -41,6 +43,8 @@ HANDLERS = {
     "smartrecruiters": fill_smartrecruiters,
     "taleo": fill_taleo,
     "successfactors": fill_successfactors,
+    "ashby": fill_ashby,
+    "teamtailor": fill_teamtailor,
 }
 
 

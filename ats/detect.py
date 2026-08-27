@@ -20,11 +20,23 @@ PLATFORM_PATTERNS = {
         r"|jobs\.oxinst\.com|careers\.stratasys\.com",
         re.I,
     ),
+    "ashby": re.compile(r"jobs\.ashbyhq\.com", re.I),
     "aps": re.compile(r"apsphysicsjobs\.com", re.I),
     "lanl": re.compile(r"lanl\.jobs", re.I),
     "ornl": re.compile(r"jobs\.ornl\.gov", re.I),
     "slac": re.compile(r"careersearch\.stanford\.edu", re.I),
     "snl": re.compile(r"sandia\.gov", re.I),
+    # Teamtailor has no single universal host — each customer's real apply
+    # flow stays on its own branded `careers.{company}.com` domain rather
+    # than redirecting to a shared teamtailor.com host (confirmed live
+    # 2026-08-26/27 against scrapers/bluefors.py: careers.bluefors.com's own
+    # job posting page IS the apply page, Turbo-loads the form in place, no
+    # redirect anywhere). Same one-off-branded-domain situation as the
+    # successfactors entry above; add each new Teamtailor customer's domain
+    # here as it's found. `\.teamtailor\.com` is also included for any
+    # customer that hasn't set up a custom domain and still uses Teamtailor's
+    # own default subdomain.
+    "teamtailor": re.compile(r"\.teamtailor\.com|careers\.bluefors\.com", re.I),
 }
 
 
@@ -52,7 +64,13 @@ def detect_platform(url: str) -> str:
 # before hitting a real gate, so they're partial, not "fully filled."
 # workday/taleo/successfactors/ornl/lanl/snl are pure gate-detectors — no
 # field gets filled at all.
-EASY_APPLY_PLATFORMS = {"greenhouse", "lever", "jazzhr", "aps"}
+#
+# ashby and teamtailor confirmed live 2026-08-26/27 (see ats/ashby.py and
+# ats/teamtailor.py docstrings): both load the real application form with
+# no account-creation/sign-in gate anywhere in the path, and neither has a
+# CAPTCHA blocking the fields themselves (Ashby's invisible reCAPTCHA only
+# fires on submit; Teamtailor's test posting had no CAPTCHA at all).
+EASY_APPLY_PLATFORMS = {"greenhouse", "lever", "jazzhr", "aps", "ashby", "teamtailor"}
 
 
 def is_easy_apply(url: str) -> bool:
