@@ -226,6 +226,134 @@
             </div>
           </details>
           {% endif %}
+
+          {% if photonics_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="photonics" checked>
+              </span>
+              Photonics &amp; Optics ({{ photonics_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in photonics_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="photonics" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if semiconductor_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="semiconductors" checked>
+              </span>
+              Semiconductors ({{ semiconductor_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in semiconductor_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="semiconductors" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if energy_nuclear_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="energy-nuclear" checked>
+              </span>
+              Energy &amp; Advanced Nuclear ({{ energy_nuclear_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in energy_nuclear_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="energy-nuclear" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if medical_materials_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="medical-materials" checked>
+              </span>
+              Medical Physics &amp; Materials ({{ medical_materials_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in medical_materials_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="medical-materials" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if quant_metrology_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="quant-metrology" checked>
+              </span>
+              Quant Finance &amp; Metrology ({{ quant_metrology_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in quant_metrology_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="quant-metrology" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if industrial_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="industrial" checked>
+              </span>
+              Geophysics, Robotics &amp; Acoustics ({{ industrial_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in industrial_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="industrial" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if space_automotive_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="space-automotive" checked>
+              </span>
+              Automotive/LIDAR &amp; Space ({{ space_automotive_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in space_automotive_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="space-automotive" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if cryo_additive_sites %}
+          <details class="site-group">
+            <summary>
+              <span class="group-select" onclick="event.stopPropagation();">
+                <input type="checkbox" class="group-toggle" data-group="cryo-additive" checked>
+              </span>
+              Cryogenics &amp; Additive Mfg ({{ cryo_additive_sites | length }})
+            </summary>
+            <div class="group-body">
+              {% for s in cryo_additive_sites %}
+                <label><input type="checkbox" name="sites" class="group-item" data-group="cryo-additive" value="{{ s }}" checked> {{ s }}</label>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
         </div>
         <div class="checks">
           <strong style="font-size:13px; color:var(--muted);">Modes</strong>

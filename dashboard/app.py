@@ -37,7 +37,25 @@ COMPANY_SITES = [
     "ionq", "lockheed_martin", "mitre", "northrop_grumman", "psiquantum",
     "quantinuum", "rigetti", "spacex",
 ]
-VALID_SITES = GENERAL_SITES + NATIONAL_LAB_SITES + OTHER_NATIONAL_LAB_SITES + COMPANY_SITES
+# Companies added in the field-by-field expansion (photonics, NOAA,
+# semiconductors, then the rest of the brainstormed list) got split into
+# their own thematic groups instead of dumping 55 more checkboxes into
+# COMPANY_SITES above — same legibility reasoning as the two national-lab
+# groups, just applied one level deeper once "Companies" itself got large.
+PHOTONICS_SITES = ["coherent", "hamamatsu", "ipg_photonics", "lumentum", "mks_instruments", "nlight", "thorlabs"]
+SEMICONDUCTOR_SITES = ["analog_devices", "applied_materials", "asml", "globalfoundries", "intel", "micron", "nvidia", "texas_instruments"]
+ENERGY_NUCLEAR_SITES = ["commonwealth_fusion", "form_energy", "helion", "kairos_power", "nuscale", "oklo", "quantumscape", "tae", "terrapower", "x_energy"]
+MEDICAL_MATERIALS_SITES = ["corning", "dupont", "ge_healthcare", "philips", "siemens_healthineers", "three_m"]
+QUANT_METROLOGY_SITES = ["deshaw", "jane_street", "jump_trading", "national_instruments", "two_sigma"]
+INDUSTRIAL_SITES = ["abb", "boston_dynamics", "bose", "halliburton", "rockwell_automation", "slb"]
+SPACE_AUTOMOTIVE_SITES = ["firefly_aerospace", "iridium", "maxar", "ouster", "planet_labs", "rocket_lab", "sierra_space", "viasat", "waymo"]
+CRYO_ADDITIVE_SITES = ["bluefors", "markforged", "oxford_instruments", "stratasys"]
+VALID_SITES = (
+    GENERAL_SITES + NATIONAL_LAB_SITES + OTHER_NATIONAL_LAB_SITES + COMPANY_SITES
+    + PHOTONICS_SITES + SEMICONDUCTOR_SITES + ENERGY_NUCLEAR_SITES
+    + MEDICAL_MATERIALS_SITES + QUANT_METROLOGY_SITES + INDUSTRIAL_SITES
+    + SPACE_AUTOMOTIVE_SITES + CRYO_ADDITIVE_SITES
+)
 VALID_MODES = ["local", "remote", "life_change"]
 STATUS_TABS = [
     "needs_review", "discovered", "submitted", "skipped", "rejected",
@@ -86,6 +104,14 @@ def home():
         national_lab_sites=NATIONAL_LAB_SITES,
         other_national_lab_sites=OTHER_NATIONAL_LAB_SITES,
         company_sites=COMPANY_SITES,
+        photonics_sites=PHOTONICS_SITES,
+        semiconductor_sites=SEMICONDUCTOR_SITES,
+        energy_nuclear_sites=ENERGY_NUCLEAR_SITES,
+        medical_materials_sites=MEDICAL_MATERIALS_SITES,
+        quant_metrology_sites=QUANT_METROLOGY_SITES,
+        industrial_sites=INDUSTRIAL_SITES,
+        space_automotive_sites=SPACE_AUTOMOTIVE_SITES,
+        cryo_additive_sites=CRYO_ADDITIVE_SITES,
         modes=VALID_MODES,
         sweep=sweep_status(),
         distance=load_distance_settings(),
