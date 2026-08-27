@@ -37,6 +37,14 @@ CREATE TABLE IF NOT EXISTS applications (
     UNIQUE(job_id)
 );
 
+CREATE TABLE IF NOT EXISTS profile_answers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prompt TEXT NOT NULL UNIQUE,        -- an application custom-question prompt, verbatim
+    answer TEXT NOT NULL,               -- Simon's own stock answer, reusable across ATS auto-fill
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_jobs_score ON jobs(score DESC);
 -- idx_jobs_priority_score is created in db/database.py's _migrate(), not
 -- here — on an existing (pre-priority_score) database, this script runs

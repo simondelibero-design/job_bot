@@ -48,6 +48,15 @@ def _migrate(conn):
     # the column, so an index on it there would fail with "no such column".
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_priority_score ON jobs(priority_score DESC)")
 
+    existing_app_columns = {row["name"] for row in conn.execute("PRAGMA table_info(applications)")}
+    if "needs_review_json" not in existing_app_columns:
+        # Structured sibling to the free-text `notes` column: a JSON list of
+        # the exact prompt strings an ats/*.py handler's needs_review list
+        # returned, so /struggles_to_answer can parse real prompts back out
+        # without splitting `notes`'s "; "-joined display string (fragile —
+        # a prompt's own text can contain "; ").
+        conn.execute("ALTER TABLE applications ADD COLUMN needs_review_json TEXT")
+
 
 def upsert_job(job: dict) -> int:
     """Insert a discovered job, or ignore if (source, source_job_id) already logged.
@@ -121,7 +130,8 @@ def top_jobs(limit: int = 50, min_score: float = 0):
 
 
 def set_application_status(job_id: int, status: str, notes: str | None = None,
-                            ats_platform: str | None = None):
+                            ats_platform: str | None = None,
+                            needs_review: list[str] | None = None):
     with get_conn() as conn:
         fields = ["status = :status"]
         params = {"status": status, "job_id": job_id}
@@ -131,6 +141,9 @@ def set_application_status(job_id: int, status: str, notes: str | None = None,
         if ats_platform is not None:
             fields.append("ats_platform = :ats_platform")
             params["ats_platform"] = ats_platform
+        if needs_review is not None:
+            fields.append("needs_review_json = :needs_review_json")
+            params["needs_review_json"] = json.dumps(needs_review)
         if status == "submitted":
             fields.append("applied_at = :applied_at")
             params["applied_at"] = datetime.now(timezone.utc).isoformat()
@@ -159,6 +172,82 @@ def restore_job(job_id: int):
             "UPDATE jobs SET excluded = 0, phd_flag = NULL WHERE id = ?",
             (job_id,),
         )
+
+
+def list_profile_answers() -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM profile_answers ORDER BY updated_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def upsert_profile_answer(prompt: str, answer: str) -> int:
+    """Adds a new prompt/answer pair, or overwrites the answer if that exact
+    prompt text already has one (re-answering is deliberate, not a
+    duplicate)."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO profile_answers (prompt, answer, created_at, updated_at)
+            VALUES (:prompt, :answer, :now, :now)
+            ON CONFLICT(prompt) DO UPDATE SET answer = :answer, updated_at = :now
+            """,
+            {"prompt": prompt, "answer": answer, "now": now},
+        )
+        row = conn.execute(
+            "SELECT id FROM profile_answers WHERE prompt = ?", (prompt,)
+        ).fetchone()
+        return row["id"]
+
+
+def delete_profile_answer(answer_id: int):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM profile_answers WHERE id = ?", (answer_id,))
+
+
+def list_unanswered_prompts() -> list[dict]:
+    """Every distinct prompt string surfaced in some job's
+    applications.needs_review_json that doesn't already have a matching
+    row in profile_answers (exact-text match). Returns one entry per
+    distinct prompt, with a count of how many jobs hit it and one example
+    job for context — not one row per job, since the same custom question
+    (e.g. "Are you eligible to work in the U.S.?") shows up on many
+    postings on the same ATS platform."""
+    with get_conn() as conn:
+        answered = {
+            row["prompt"] for row in conn.execute("SELECT prompt FROM profile_answers")
+        }
+        rows = conn.execute(
+            """
+            SELECT applications.needs_review_json, jobs.id AS job_id, jobs.title, jobs.company
+            FROM applications
+            JOIN jobs ON jobs.id = applications.job_id
+            WHERE applications.needs_review_json IS NOT NULL
+            ORDER BY applications.id DESC
+            """
+        ).fetchall()
+
+        by_prompt: dict[str, dict] = {}
+        for row in rows:
+            try:
+                prompts = json.loads(row["needs_review_json"])
+            except (TypeError, ValueError):
+                continue
+            for prompt in prompts:
+                prompt = prompt.strip()
+                if not prompt or prompt in answered:
+                    continue
+                entry = by_prompt.setdefault(prompt, {
+                    "prompt": prompt, "count": 0,
+                    "example_job_id": row["job_id"],
+                    "example_title": row["title"],
+                    "example_company": row["company"],
+                })
+                entry["count"] += 1
+
+        return sorted(by_prompt.values(), key=lambda e: e["count"], reverse=True)
 
 
 if __name__ == "__main__":

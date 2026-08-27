@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Retiarius struggles to answer</title>
+<style>
+  :root {
+    --bg: #16171d; --card: #1f212a; --border: #33353f; --text: #eaeaef;
+    --muted: #9a9ca8; --accent: #4d82f3; --good: #22a35f; --bad: #ff6b5c;
+    --warn: #f2b84d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .sub a { color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 16px; margin-bottom: 12px; max-width: 720px; }
+  .prompt { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .example { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .count-badge { display: inline-block; background: #3a2f14; color: var(--warn); font-size: 11px;
+                 font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 8px; }
+  .answer-form textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 10px; font-size: 13px; font-family: inherit; margin-bottom: 8px;
+  }
+  button.primary { background: var(--accent); color: white; border: none; border-radius: 6px;
+                   padding: 8px 14px; font-size: 13px; cursor: pointer; }
+  .empty { color: var(--muted); padding: 20px 0; }
+  .empty a { color: var(--accent); }
+</style>
+</head>
+<body>
+  <h1>Struggles to answer</h1>
+  <div class="sub">
+    Custom application prompts seen during auto-fill that don't have a saved answer yet — sorted by how many jobs asked them.
+    · <a href="{{ url_for('home') }}">Home</a>
+    · <a href="{{ url_for('queue') }}">Queue</a>
+    · <a href="{{ url_for('profile') }}">Profile</a>
+  </div>
+
+  {% if not prompts %}
+    <div class="empty">
+      Nothing unanswered right now. This list fills up as you use "Prepare &amp; Open" on jobs in the
+      <a href="{{ url_for('queue') }}">queue</a> — every custom question an ATS handler can't answer
+      confidently shows up here until you save an answer for it.
+    </div>
+  {% endif %}
+
+  {% for p in prompts %}
+    <div class="card">
+      <div class="prompt">{{ p.prompt }}<span class="count-badge">seen on {{ p.count }} job{{ 's' if p.count != 1 else '' }}</span></div>
+      <div class="example">e.g. {{ p.example_title }} — {{ p.example_company }}</div>
+      <form class="answer-form" method="post" action="{{ url_for('struggles_to_answer_answer') }}">
+        <input type="hidden" name="prompt" value="{{ p.prompt }}">
+        <textarea name="answer" rows="3" placeholder="Your answer — saved to your profile for reuse" required></textarea>
+        <button class="primary" type="submit">Save to profile</button>
+      </form>
+    </div>
+  {% endfor %}
+</body>
+</html>

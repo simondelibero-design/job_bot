@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Retiarius profile</title>
+<style>
+  :root {
+    --bg: #16171d; --card: #1f212a; --border: #33353f; --text: #eaeaef;
+    --muted: #9a9ca8; --accent: #4d82f3; --good: #22a35f; --bad: #ff6b5c;
+    --warn: #f2b84d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .sub a { color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 16px; margin-bottom: 12px; max-width: 720px; }
+  .add-form textarea, .add-form input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 10px; font-size: 13px; font-family: inherit; margin-bottom: 10px;
+  }
+  .add-form label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  button.primary { background: var(--accent); color: white; border: none; border-radius: 6px;
+                   padding: 8px 14px; font-size: 13px; cursor: pointer; }
+  .answer-card .prompt { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  .answer-card .answer { font-size: 13px; color: var(--text); white-space: pre-wrap; }
+  .answer-card .meta-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .answer-card .updated { font-size: 11px; color: var(--muted); }
+  .del-btn { background: transparent; color: var(--bad); border: 1px solid var(--bad);
+             border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .empty { color: var(--muted); padding: 20px 0; }
+</style>
+</head>
+<body>
+  <h1>Profile</h1>
+  <div class="sub">
+    A bank of application-question prompts and your own stock answers, reusable across ATS auto-fill.
+    · <a href="{{ url_for('home') }}">Home</a>
+    · <a href="{{ url_for('queue') }}">Queue</a>
+    · <a href="{{ url_for('struggles_to_answer') }}">Struggles to answer</a>
+  </div>
+
+  <div class="card">
+    <form class="add-form" method="post" action="{{ url_for('profile_add') }}">
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" name="prompt" rows="2" placeholder="e.g. Why do you want to work here?" required></textarea>
+      <label for="answer">Your answer</label>
+      <textarea id="answer" name="answer" rows="4" placeholder="Your stock answer" required></textarea>
+      <button class="primary" type="submit">Save</button>
+    </form>
+  </div>
+
+  {% if not answers %}
+    <div class="empty">No saved answers yet — add one above, or answer prompts from <a href="{{ url_for('struggles_to_answer') }}" style="color: var(--accent);">Struggles to answer</a>.</div>
+  {% endif %}
+
+  {% for a in answers %}
+    <div class="card answer-card">
+      <div class="prompt">{{ a.prompt }}</div>
+      <div class="answer">{{ a.answer }}</div>
+      <div class="meta-row">
+        <span class="updated">Updated {{ a.updated_at[:10] }}</span>
+        <form method="post" action="{{ url_for('profile_delete', answer_id=a.id) }}" onsubmit="return confirm('Delete this answer?');">
+          <button class="del-btn" type="submit">Delete</button>
+        </form>
+      </div>
+    </div>
+  {% endfor %}
+</body>
+</html>

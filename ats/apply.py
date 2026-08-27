@@ -84,7 +84,8 @@ def prepare_application(job_id: int, job_url: str, resume: dict, headless: bool 
         browser.close()
 
     notes = "; ".join(result["needs_review"]) if result["needs_review"] else "Auto-filled, ready to review"
-    set_application_status(job_id, "needs_review", ats_platform=platform, notes=notes)
+    set_application_status(job_id, "needs_review", ats_platform=platform, notes=notes,
+                            needs_review=result["needs_review"])
     return result
 
 
@@ -105,10 +106,13 @@ def prepare_and_open(job_id: int, job_url: str, resume: dict):
         if handler:
             result = handler(page, resume)
             notes = "; ".join(result["needs_review"]) if result["needs_review"] else "Auto-filled, ready to review"
+            needs_review = result["needs_review"]
         else:
             notes = f"Unrecognized ATS platform — fill out manually ({job_url})"
+            needs_review = None
 
-        set_application_status(job_id, "needs_review", ats_platform=platform, notes=notes)
+        set_application_status(job_id, "needs_review", ats_platform=platform, notes=notes,
+                                needs_review=needs_review)
 
         try:
             page.wait_for_event("close", timeout=0)

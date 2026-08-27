@@ -14,7 +14,10 @@ from flask import Flask, redirect, render_template, request, url_for
 sys.path.append(str(Path(__file__).parent.parent))
 from ats.detect import is_easy_apply  # noqa: E402
 from config import DEFAULT_DISTANCE_SETTINGS, SETTINGS_PATH, load_distance_settings  # noqa: E402
-from db.database import get_conn, restore_job, set_application_status  # noqa: E402
+from db.database import (  # noqa: E402
+    delete_profile_answer, get_conn, list_profile_answers, list_unanswered_prompts,
+    restore_job, set_application_status, upsert_profile_answer,
+)
 
 ROOT = Path(__file__).parent.parent
 RESUME_DIR = ROOT / "resume"
@@ -282,6 +285,40 @@ def action(job_id):
     elif action_name in status_map:
         set_application_status(job_id, status_map[action_name])
     return redirect(request.referrer or url_for("queue"))
+
+
+@app.route("/profile")
+def profile():
+    return render_template("profile.html", answers=list_profile_answers())
+
+
+@app.route("/profile/add", methods=["POST"])
+def profile_add():
+    prompt = request.form.get("prompt", "").strip()
+    answer = request.form.get("answer", "").strip()
+    if prompt and answer:
+        upsert_profile_answer(prompt, answer)
+    return redirect(url_for("profile"))
+
+
+@app.route("/profile/<int:answer_id>/delete", methods=["POST"])
+def profile_delete(answer_id):
+    delete_profile_answer(answer_id)
+    return redirect(url_for("profile"))
+
+
+@app.route("/struggles-to-answer")
+def struggles_to_answer():
+    return render_template("struggles_to_answer.html", prompts=list_unanswered_prompts())
+
+
+@app.route("/struggles-to-answer/answer", methods=["POST"])
+def struggles_to_answer_answer():
+    prompt = request.form.get("prompt", "").strip()
+    answer = request.form.get("answer", "").strip()
+    if prompt and answer:
+        upsert_profile_answer(prompt, answer)
+    return redirect(url_for("struggles_to_answer"))
 
 
 if __name__ == "__main__":
