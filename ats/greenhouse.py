@@ -40,19 +40,55 @@ section's wrapper div produces a spurious "Resume/CV*" needs_review entry
 even though the resume upload itself succeeded correctly (verified
 separately: the filename shows up in the page after fill). Harmless
 false positive, not a real gap in what gets filled.
+
+Third real gap found and fixed live 2026-08-27: several companies embed
+Greenhouse's application widget on their own branded domain via a
+`gh_jid=` query param (see ats/detect.py's pattern for this) instead of
+linking to `boards.greenhouse.io` directly — confirmed on PsiQuantum,
+Jump Trading, and Waymo. The actual form fields live inside a
+`job-boards.greenhouse.io/embed/job_app?...` iframe on the page, not the
+top-level DOM, so every `page.query_selector(...)` call here used to find
+nothing. Waymo's variant needs an extra step even the iframe-aware fix
+alone doesn't cover: the discovered job URL lands on a description page
+with an "Apply now" link, and the iframe only appears after clicking it
+(same "one click before the real form" situation ats/ashby.py hit).
+`_resolve_context()` below tries, in order: fields already on the
+top-level page (the normal `boards.greenhouse.io` case) → an existing
+Greenhouse iframe (PsiQuantum/Jump Trading) → clicking an "Apply" link/
+button and checking again for the iframe. Everything else in this module
+operates on whatever context that resolves to, unchanged.
+
+Known remaining gap, confirmed live but not fixed: Waymo's `gh_jid=` page
+doesn't actually embed the classic iframe at all — clicking "Apply" reveals
+a form section directly on the same top-level page (`#apply` anchor, no
+new iframe), using entirely different, dynamically-suffixed field ids
+(`form_first_name_1_3_0` rather than `#first_name`) that also appeared
+duplicated across what look like two separate field sets on the one
+posting checked. This is a different, newer Greenhouse embeddable-widget
+variant, not the same platform version this handler already knows how to
+fill — `_resolve_context()` falls back to returning the bare `page` in
+this case, so known_ids/aria-required detection still runs and surfaces
+real questions, but the standard fields (name/email/phone/resume) won't
+get auto-filled here specifically. Solving this properly would need
+matching fields by label text the way ats/ashby.py locates LinkedIn,
+rather than assuming a fixed id — not done here given the scope already
+covered this session.
 """
 from playwright.sync_api import Page
 
 
 def fill_application(page: Page, resume: dict) -> dict:
-    """Fills known fields on a Greenhouse application page already loaded
-    in `page`. Returns {"platform": "greenhouse", "needs_review": [...]}."""
+    """Fills known fields on a Greenhouse application — either a native
+    `boards.greenhouse.io` page, or one embedded via `gh_jid=` in another
+    company's own page (see module docstring). Returns
+    {"platform": "greenhouse", "needs_review": [...]}."""
+    ctx = _resolve_context(page)
     unanswered = []
 
     def fill_if_present(selector: str, value: str | None):
         if not value:
             return
-        el = page.query_selector(selector)
+        el = ctx.query_selector(selector)
         if el:
             el.fill(value)
 
@@ -62,7 +98,7 @@ def fill_application(page: Page, resume: dict) -> dict:
     fill_if_present("#phone", resume.get("phone"))
 
     resume_pdf = resume.get("resume_pdf_path")
-    resume_input = page.query_selector("#resume")
+    resume_input = ctx.query_selector("#resume")
     if resume_input and resume_pdf:
         resume_input.set_input_files(resume_pdf)
 
@@ -71,11 +107,11 @@ def fill_application(page: Page, resume: dict) -> dict:
     # `[aria-required="true"]` is the real signal on Greenhouse's current
     # form, not the plain HTML `required` attribute — see module docstring.
     known_ids = {"first_name", "last_name", "email", "phone", "resume", "country"}
-    for el in page.query_selector_all('[aria-required="true"]'):
+    for el in ctx.query_selector_all('[aria-required="true"]'):
         el_id = el.get_attribute("id") or ""
         if el_id in known_ids:
             continue
-        label = _label_for(page, el)
+        label = _label_for(ctx, el)
         if el.get_attribute("role") == "combobox":
             label = f"{label or el_id} (dropdown/combobox — needs a real selection, not just typed text)"
         unanswered.append(label or f"(unlabeled field: {el_id or el.get_attribute('name')})")
@@ -83,10 +119,35 @@ def fill_application(page: Page, resume: dict) -> dict:
     return {"platform": "greenhouse", "needs_review": unanswered, "submitted": False}
 
 
-def _label_for(page: Page, el) -> str | None:
+def _resolve_context(page: Page):
+    """Returns whatever should be queried for form fields — see module
+    docstring for the three cases this handles."""
+    if page.query_selector("#first_name"):
+        return page
+
+    iframe_el = page.query_selector("iframe[src*='greenhouse.io']")
+    if iframe_el:
+        frame = iframe_el.content_frame()
+        if frame:
+            return frame
+
+    apply_link = page.query_selector("a:has-text('Apply'), button:has-text('Apply')")
+    if apply_link:
+        apply_link.click()
+        page.wait_for_timeout(1500)
+        iframe_el = page.query_selector("iframe[src*='greenhouse.io']")
+        if iframe_el:
+            frame = iframe_el.content_frame()
+            if frame:
+                return frame
+
+    return page
+
+
+def _label_for(ctx, el) -> str | None:
     el_id = el.get_attribute("id")
     if el_id:
-        label = page.query_selector(f'label[for="{el_id}"]')
+        label = ctx.query_selector(f'label[for="{el_id}"]')
         if label:
             return label.text_content().strip()
     container = el.evaluate_handle("el => el.closest('div')")

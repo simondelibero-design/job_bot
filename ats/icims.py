@@ -14,16 +14,58 @@ off-limits for automation in this project, so this handler prefills the one
 safe field (email — just typing text) and stops there. Whether every iCIMS
 tenant gates behind hCaptcha the same way hasn't been confirmed; the handler
 flags whichever gate elements it actually finds rather than assuming.
+
+Two real bugs found and fixed live 2026-08-27, running the actual
+prepare_application() pipeline against fresh PPPL and Iridium postings:
+(1) `_content_frame`'s "first frame whose URL contains icims.com" check
+returned the wrong frame on tenants where the *top-level page itself* is
+also hosted directly on a `{tenant}.icims.com` subdomain (both PPPL's and
+Iridium's are) — `page.frames[0]` is always the main frame, and since its
+own URL matched too, the check never got to the real nested content
+iframe (`...?in_iframe=1`) where the actual "Apply" button and form live.
+Confirmed live: the outer frame's body has no "apply" text anywhere; the
+real content only appears in the `in_iframe=1` frame, and only after a
+few extra seconds to render. Now prefers a frame whose URL contains
+`in_iframe=1` when one exists. (2) The apply-button text this handler
+looked for, "Apply for this job online", doesn't match every tenant's
+copy — PPPL's actual button reads "Apply for This Job". Broadened to a
+visible-only partial-text match on "Apply" (a hidden "Please Enable
+Cookies" message elsewhere on the page also contains that word, so
+matching on visibility, not just text, matters here).
 """
 from playwright.sync_api import Page
 
 
 def fill_application(page: Page, resume: dict) -> dict:
     ctx = _content_frame(page)
+    # PPPL/Iridium's nested content iframe reliably needs ~3s to render its
+    # real content — confirmed live (2026-08-27) across repeated runs at
+    # 1.5s (empty) vs 3s+ (populated). A plain text match also isn't safe
+    # here: a hidden "Please Enable Cookies" message contains the word
+    # "apply" in its body and was being matched first, so this uses a
+    # visible-only locator to skip it.
+    apply_locator = ctx.get_by_text("Apply", exact=False).locator("visible=true")
+    try:
+        apply_locator.first.wait_for(timeout=8000)
+        apply_locator.first.click(timeout=3000)
+    except Exception:
+        pass
 
-    _click_if_present(ctx, "text=Apply for this job online")
-    page.wait_for_timeout(1000)
-
+    # Re-fetch the content frame after the click: it navigates to a new
+    # URL (.../job -> .../login), and querying the pre-click `ctx`
+    # reference against that new content was unreliable in testing —
+    # sometimes finding #email, sometimes not, depending on exactly when
+    # Playwright's frame-tree updated relative to this check. Re-scanning
+    # page.frames() fresh removes that race entirely. The render time
+    # itself also varies by tenant — confirmed live: Iridium's login page
+    # is ready within ~1s, PPPL's needs several seconds longer — so this
+    # waits adaptively for #email itself rather than guessing a fixed delay.
+    ctx = _content_frame(page)
+    try:
+        ctx.wait_for_selector("#email", timeout=8000)
+    except Exception:
+        pass
+    ctx = _content_frame(page)
     email_input = ctx.query_selector("#email")
     if not email_input:
         return {
@@ -50,13 +92,10 @@ def fill_application(page: Page, resume: dict) -> dict:
 
 
 def _content_frame(page: Page):
-    for frame in page.frames:
-        if "icims.com" in frame.url:
+    icims_frames = [f for f in page.frames if "icims.com" in f.url]
+    for frame in icims_frames:
+        if "in_iframe=1" in frame.url:
             return frame
+    if icims_frames:
+        return icims_frames[0]
     return page
-
-
-def _click_if_present(ctx, selector: str):
-    el = ctx.query_selector(selector)
-    if el:
-        el.click()

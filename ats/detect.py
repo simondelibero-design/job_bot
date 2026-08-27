@@ -2,7 +2,16 @@
 import re
 
 PLATFORM_PATTERNS = {
-    "greenhouse": re.compile(r"(boards|job-boards)\.greenhouse\.io", re.I),
+    # Several companies embed Greenhouse's application widget on their own
+    # branded domain via a `gh_jid=` query param (confirmed live 2026-08-27:
+    # psiquantum.com/apply, careers.withwaymo.com/jobs, jumptrading.com/hr/job)
+    # instead of linking out to boards.greenhouse.io directly — the real form
+    # renders inside a same-origin-policy-exempt `job-boards.greenhouse.io/
+    # embed/job_app?...` iframe on the page. ats/greenhouse.py's handler
+    # checks for and pierces that iframe when the fields aren't in the
+    # top-level DOM, so detecting these as "greenhouse" is correct, not just
+    # a label — see that module's docstring.
+    "greenhouse": re.compile(r"(boards|job-boards)\.greenhouse\.io|[?&]gh_jid=", re.I),
     "lever": re.compile(r"jobs\.lever\.co", re.I),
     "workday": re.compile(r"\.myworkdayjobs\.com", re.I),
     "icims": re.compile(r"\.icims\.com", re.I),

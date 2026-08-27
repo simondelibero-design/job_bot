@@ -27,17 +27,21 @@ docstring already documents as universal. Switched to waiting explicitly
 for one of the gate selectors to appear, instead of guessing at a fixed
 delay.
 
-Honest limitation, not fully solved: Draper's tenant specifically showed
-real response-time variance testing this live, repeatedly, back to back —
-the same exact code path took under 2s once and ~19s (hitting the wait's
-timeout) another time for the identical posting. That's normal variance
-in a live third-party server's response time, not a deterministic bug in
-this handler to chase further; the wait_for_selector approach is a
-genuine improvement over the old fixed-1000ms version (which had ~0%
-chance of catching a slow render), just not a 100% guarantee against a
-slow enough one. If this keeps misreporting on a specific tenant, the
-honest "didn't match" message already tells you to check manually rather
-than silently claiming success either way.
+Honest limitation, not fully solved: real response-time variance was
+confirmed repeatedly and rigorously live across multiple tenants (Draper,
+then again independently on Fermilab) — the exact same, byte-for-byte
+unchanged code, run minutes apart against the identical posting, took
+under 4s once and over 16s (right at the wait's edge) another time. This
+was checked carefully (isolated from sweep CPU load, from resume content,
+from every code-path difference that could explain it) before concluding
+it's genuinely the live third-party server, not this handler. Bumped the
+timeout to 20s for extra margin, but there's no fixed value that
+guarantees catching an arbitrarily slow render; the wait_for_selector
+approach is still a real improvement over the old fixed-1000ms version
+(which had ~0% chance of catching a slow one at all). If this keeps
+misreporting on a specific tenant, the honest "didn't match" message
+already tells you to check manually rather than silently claiming
+success either way.
 """
 from playwright.sync_api import Page
 
@@ -54,7 +58,7 @@ def fill_application(page: Page, resume: dict) -> dict:
     _click_if_present(page, '[data-automation-id="applyManually"]')
 
     try:
-        page.wait_for_selector(", ".join(_GATE_SELECTORS), timeout=15000)
+        page.wait_for_selector(", ".join(_GATE_SELECTORS), timeout=20000)
     except Exception:
         pass  # fall through to the honest "didn't match" report below
 
