@@ -499,19 +499,85 @@ not trusted from agent reports alone). Went from 37 discovery sources to
   later (e.g. checking the PID is actually alive, not just trusting the
   file's `status` field) if this comes up again.
 
-## Next up (not started — pick up here)
+## Session 7 (2026-08-27): apply-pipeline diagnostic pass, Eightfold handler
 
-Two new dashboard sub-pages, requested but not yet built:
-- **`/profile`** — a bank of application-question prompts mapped to the
-  user's own stock answers, reusable across ATS auto-fill instead of
-  re-answering the same custom questions per posting.
-- **`/struggles_to_answer`** — an inbox of prompts encountered during
-  auto-fill that don't have an answer yet. Likely data source: the
-  `applications.notes` field, where every `ats/*.py` handler already logs
-  unanswerable custom questions into `needs_review` (see e.g.
-  `ats/greenhouse.py`, `ats/ashby.py`, `ats/teamtailor.py`) — this would
-  surface that same data as an actionable list instead of it just sitting
-  in the DB.
+`/profile` and `/struggles_to_answer` (planned end of Session 6) got
+built, then the user asked to actually run the apply pipeline against the
+real queue and see what breaks. Two rounds of this, then a new ATS
+platform, all live-verified — not simulated.
+
+- **`/profile`** — bank of application-question prompts mapped to the
+  user's own stock answers (`db/database.py`'s new `profile_answers`
+  table). **`/struggles_to_answer`** — inbox of real unanswered prompts
+  pulled from `applications.needs_review_json` (a new structured sibling
+  to the old free-text `notes` column — splitting `notes` on "; " would
+  break on any prompt containing its own semicolons, so `ats/apply.py` now
+  passes the real list straight through). Answering one on
+  `/struggles_to_answer` saves it straight to `/profile`. 23 real answers
+  already saved (work authorization, export-control "U.S. Person" status,
+  security clearance, current location, "how did you hear about us",
+  prior-employment questions) — see `dashboard/templates/profile.html`
+  for the full list rather than trusting this summary to stay current.
+- **Two rounds of real-queue diagnostic testing**, 50 jobs total across
+  every source that has ever produced a discovered job (zero untested by
+  the end) — not synthetic tests, the actual `prepare_application()`
+  pipeline run headlessly against real postings, with each job's
+  `applications` row reverted to its original state after every check.
+  Found and fixed **8 real bugs**:
+  - `ats/apply.py`: an uncaught handler exception used to crash the whole
+    flow with zero DB update — for the real "Prepare & Open" button that
+    meant a visible browser window could die silently. Now caught and
+    turned into an honest needs_review entry.
+  - `ats/successfactors.py`, `ats/icims.py`: a broad "Apply" selector
+    could grab a hidden responsive-layout duplicate first, and
+    Playwright's default 30s wait on a hidden element hung the whole
+    handler. Both now use a short explicit click timeout.
+  - `ats/ashby.py`: the handler assumed it was already on the
+    `/application` form page; the real discovered URL lands one click
+    before that. Now clicks "Apply for this Job" itself if needed.
+  - `ats/greenhouse.py`: (1) the current form marks required fields with
+    `aria-required="true"`, not the plain `required` attribute this was
+    built against — fixed a real "(unlabeled field: None)" bug on every
+    posting. (2) PsiQuantum/Jump Trading/Waymo embed Greenhouse via a
+    `gh_jid=` param on their own domain instead of linking to
+    boards.greenhouse.io — `ats/detect.py`'s pattern was blind to this;
+    now detects it and pierces the real embedded iframe (PsiQuantum, Jump
+    Trading fill correctly; Waymo turned out to use a genuinely different
+    embed variant with dynamic field ids — documented as a known gap, not
+    forced).
+  - `ats/icims.py`: on tenants where the top-level page is itself hosted
+    on `*.icims.com` (PPPL, Iridium), the old "first frame containing
+    icims.com" check grabbed the wrong frame; also a stale frame
+    reference captured before the post-click navigation was unreliable to
+    query afterward. Both fixed; PPPL and Iridium now correctly pre-fill
+    email and flag the GDPR/hCaptcha step.
+  - `ats/workday.py`: bumped the wait timeout (15s → 20s) and switched
+    from a blind fixed delay to waiting for the actual gate element.
+    Rigorously reconfirmed (byte-identical code, minutes apart, same
+    posting, different results) that remaining variance is genuinely the
+    live third-party server's response time, not a bug — documented
+    honestly rather than claimed fixed.
+  - Confirmed clean with no changes needed: APS (0 review items — fully
+    auto-fillable), LANL, ORNL, SLAC, SNL, Halliburton, both Lever
+    companies tested, Bluefors, Rocket Lab.
+- **`ats/eightfold.py` — new handler**, covering Northrop Grumman,
+  Lockheed Martin, Applied Materials, GlobalFoundries. Real,
+  tenant-dependent split (not a platform-wide gate like Workday's):
+  Northrop Grumman and GlobalFoundries have a genuine account-creation
+  wall; Applied Materials and Lockheed Martin have none at all and fill
+  correctly (Lockheed Martin surfaced 24 real questions — security
+  clearance, military service, EEO, export control — with real label
+  text). A `#welcomeModal` intro dialog blocks the Apply click on some
+  tenants until dismissed. Deliberately NOT added to
+  `EASY_APPLY_PLATFORMS` since the gate isn't platform-wide — would be
+  wrong for the two gated tenants.
+- Remaining known gaps, not silently hidden: no handler yet for Jobvite
+  (NuScale, 1 company) or DirectEmployers/jobsyn.org (MITRE) or the
+  various Oracle Fusion Cloud/custom-API platforms (SLB, coherent's
+  Oracle-hosted postings, national_instruments, quantumscape, etc.) — all
+  correctly resolve to "unrecognized ATS" rather than silently failing.
+
+## Next up (not started — pick up here)
 
 Remaining candidate fields from the original brainstorm not yet covered by
 a dedicated discovery source (NOAA/NIST/NRC/FCC/FDA were all separately
@@ -520,6 +586,11 @@ investigated and resolved — see Session 5 above, either already covered by
 specifically (as distinct from the semiconductor/photonics companies
 already added), patent law/technical IP consulting, and STEM
 education/outreach.
+
+Otherwise: the apply pipeline is now in real working shape across most of
+the discovery surface — the natural next step is actually working the
+review queue for real (the dashboard's `/queue` page, "Prepare & Open"),
+not just diagnostic-testing it.
 
 ## What this project is
 
@@ -540,27 +611,30 @@ this is fully working now, don't redo the setup). Renamed from `job-bot`/
 branding) — GitHub redirects the old repo URL automatically, so existing
 clones/links still resolve.
 
-## Current real state (verified 2026-08-27, commit `3e54142`)
+## Current real state (verified 2026-08-27, commit `b0aa111`)
 
+- **13,169 jobs in `db/jobs.db`** as of this commit — check yourself,
+  the full sweep from Session 6 was still running/growing throughout
+  Session 7. `ps aux | grep run_sweep_bg` to check if it's still alive.
 - **93 discovery sources wired into `main.py`'s `VALID_SITES`** (up from 21
   at the start of Session 4, 38 at the start of Session 6). See Session 6
   above for the full sector-by-sector breakdown of what got added.
-- **A full sweep across all 93 sources/3 modes is running** — check
-  `dashboard/.sweep_lock.json` for current status. It's genuinely slow (30+
-  min and counting for local mode alone) because many of the new company
-  sources do a per-result detail-page fetch on top of the search request —
-  confirmed still alive and making real network requests each time this was
-  checked, not stuck. If `.sweep_lock.json` says `"status": "running"` but
+- **16 ATS platforms now recognized** (`ats/detect.py`'s
+  `PLATFORM_PATTERNS`), up from 13 at the end of Session 5: Ashby and
+  Teamtailor (Session 6, both genuinely gate-free, in
+  `EASY_APPLY_PLATFORMS`) and Eightfold (Session 7, tenant-dependent gate
+  — deliberately NOT in `EASY_APPLY_PLATFORMS`, see that session's notes).
+- **Session 7's diagnostic pass fixed 8 real bugs** across
+  `ats/apply.py`, `ats/successfactors.py`, `ats/icims.py`, `ats/ashby.py`,
+  `ats/greenhouse.py`, and `ats/workday.py` — see that session's summary
+  above for the full list. The apply pipeline is meaningfully more
+  reliable now than a handler bug silently crashing the whole flow.
+- If `.sweep_lock.json` says `"status": "running"` but
   `ps aux | grep run_sweep_bg` shows no matching process, the lock file is
-  stale (this happened once already this session after killing an older
-  sweep directly instead of letting it finish) — delete
-  `dashboard/.sweep_lock.json` before trying to start a new one, or
-  `/run-sweep` will refuse with a silent redirect.
-- Two ATS platforms newly confirmed genuinely gate-free and wired into
-  `EASY_APPLY_PLATFORMS`: **Ashby** (`ats/ashby.py`) and **Teamtailor**
-  (`ats/teamtailor.py`) — both live-verified against real postings
-  (Helion Energy, Bluefors) with no account-creation gate and no
-  form-blocking CAPTCHA. 15 ATS platforms recognized now, up from 13.
+  stale (happened once in Session 6 after killing a sweep directly instead
+  of letting it finish) — delete `dashboard/.sweep_lock.json` before
+  trying to start a new one, or `/run-sweep` will refuse with a silent
+  redirect.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
   `cd ~/Desktop/retiarius && source venv/bin/activate && python dashboard/app.py`
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
