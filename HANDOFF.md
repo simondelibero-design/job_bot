@@ -400,10 +400,108 @@ outdated — it works cleanly) and checked each agency's own careers page.
   short/ambiguous to add safely (collides with the National Research
   Council usage above and with unrelated "Nrc" substrings).
 
-## Next up (planned 2026-08-26, not started — pick up here)
+## Session 6 (2026-08-26/27): the field-brainstorm list built out, 93 sources total
 
-Two new dashboard sub-pages, requested but explicitly deferred until a
-brainstormed field list (below) is settled first:
+Worked through nearly the entire Session 5 field brainstorm in one long run
+of parallel background agents (personally reviewed, live-verified, and
+committed one batch at a time — same discipline as every prior session,
+not trusted from agent reports alone). Went from 37 discovery sources to
+**93**, plus two real ATS auto-fill handlers added on top.
+
+- **Photonics/optics (7)**: Coherent, Hamamatsu, IPG Photonics, Lumentum,
+  nLight, MKS Instruments, Thorlabs.
+- **Semiconductors (8)**: Intel, Texas Instruments, Micron, Applied
+  Materials, GlobalFoundries, ASML, Analog Devices, NVIDIA. Three
+  (Applied Materials, GlobalFoundries, Micron) run on **Eightfold.ai** —
+  new shared helper `scrapers/_eightfold.py`, generalizing the CSRF-token
+  pattern `northrop_grumman.py`/`lockheed_martin.py` already used.
+- **Energy/advanced nuclear (10)**: Commonwealth Fusion, TAE, Helion,
+  Form Energy, QuantumScape, X-energy, TerraPower, Oklo, Kairos Power,
+  NuScale. Two (Form Energy, Helion) on **Ashby** — new shared helper
+  `scrapers/_ashby.py`.
+- **Medical physics/materials (6)**: Siemens Healthineers, GE Healthcare,
+  Philips, Corning, 3M, DuPont.
+- **Quant finance/metrology (5)**: Jane Street (own public JSON files),
+  Two Sigma (**Avature** — new platform, not yet in `ats/detect.py`),
+  D.E. Shaw (Next.js `__NEXT_DATA__`), Jump Trading, National
+  Instruments (now Emerson/Oracle Fusion Cloud after the 2023
+  acquisition). Citadel investigated and correctly left alone
+  (Cloudflare Turnstile); Keysight/Tektronix investigated but
+  undetermined (SPA data API not locatable without a browser).
+- **Geophysics/robotics/acoustics (6)**: SLB, Halliburton, Boston
+  Dynamics, ABB, Rockwell Automation, Bose. **Baker Hughes** investigated
+  separately and confirmed genuinely blocked — Incapsula bot-detection
+  WAF challenge page on `careers.bakerhughes.com`, left alone.
+- **Automotive/LIDAR/space (10)**: Ouster, Waymo, Rocket Lab, Sierra
+  Space, Firefly Aerospace, Planet Labs, Maxar, Iridium, Viasat, and
+  **MicroVision** in place of Luminar — Luminar Technologies filed
+  Chapter 11 and MicroVision won the bankruptcy-auction for its lidar
+  business ($33.2M, completed 2026-02-03); Luminar's own legacy careers
+  URL now redirects to MicroVision's, and the postings are literally the
+  same Orlando, FL team. Labeled honestly as MicroVision, not Luminar.
+- **Cryogenics/additive mfg (5)**: Bluefors (**Teamtailor**), Oxford
+  Instruments and Stratasys (**SAP SuccessFactors "Jobs2Web"** — new
+  shared helper `scrapers/_successfactors.py`, which found that both
+  tenants' own `?q=` search param silently ignores the query and returns
+  a fixed subset — the helper walks the full board and filters
+  client-side instead), Markforged. 3D Systems investigated (a real
+  Oracle Taleo REST endpoint found) but left unbuilt — its exact
+  request-payload schema couldn't be pinned down without guessing blindly
+  against a live prod endpoint.
+- **Real bug fix along the way**: `matcher/salary.py`'s
+  `parse_salary_annual()` regex could match a bare comma with no digit
+  (a scraped salary like `", DOE"`), and `float("")` crashed mid-sweep.
+  Fixed by requiring the match start with a digit.
+- **Real detection-accuracy fix**: `ats/detect.py`'s `successfactors`
+  pattern only matched the raw `successfactors.com` domain, but Corning/
+  Halliburton/Oxford Instruments/Stratasys all front the platform behind
+  their own branded domain (same situation `ornl`/`lanl`/`slac`/`snl`
+  already needed one-off patterns for) — real functional effect, not just
+  labeling: `ats/apply.py` already has a `successfactors` handler, so
+  these four now correctly route to it instead of falling through to
+  "Unrecognized ATS."
+- **Easy-Apply reappraisal, then two new real handlers built**: `is_easy_apply()`
+  is purely URL-pattern-based, not scraper-based, so 19 of the new
+  companies (12 on Greenhouse, 5 on Lever, 2 on JazzHR) were *already*
+  easy-apply eligible with zero code changes. The user then asked to
+  live-verify the two genuinely-new, previously-unverified platforms:
+  **Ashby and Teamtailor, both confirmed gate-free** (no account
+  creation, no CAPTCHA blocking the form fields — Ashby's reCAPTCHA is
+  invisible and only fires on submit) — real handlers built
+  (`ats/ashby.py`, `ats/teamtailor.py`), live-tested against real Helion
+  and Bluefors postings by both the building agent and personally
+  re-verified before commit. Added to `EASY_APPLY_PLATFORMS`. The bulk of
+  the new sources (29 Workday, 4 iCIMS, 3 Eightfold, plus Avature/
+  DirectEmployers/Zintellect) remain confirmed-gated or genuinely
+  unverified — Workday's account-creation gate in particular is a known,
+  permanent platform-wide limit, not a "not checked yet."
+- **Dashboard home page**: 8 new collapsible site groups (Photonics &
+  Optics, Semiconductors, Energy & Advanced Nuclear, Medical Physics &
+  Materials, Quant Finance & Metrology, Geophysics/Robotics/Acoustics,
+  Automotive/LIDAR & Space, Cryogenics & Additive Mfg) instead of dumping
+  55 more checkboxes into the existing "Companies" group.
+- **Distance-tier UI**: renamed "Meh" → "Medium Far" everywhere (display
+  label only — `mid_max_miles`/`mid_weight` keys unchanged); added a
+  lock/unlock toggle on the miles sliders, locked by default, so a stray
+  drag can't accidentally trigger a full re-score.
+- **Clarified for the user**: the sweep's "remote" mode does NOT mean
+  "far away" — it's a fully separate axis (`run_remote_discovery()` in
+  `main.py` searches nationwide for jobs whose location is literally
+  "Remote") from the close/medium-far/far/life-change distance tiers,
+  which measure physical distance from home base for the *local* sweep
+  only. No rename was made — the two concepts are genuinely different,
+  and conflating them would make the UI less accurate, not more.
+- A stale `.sweep_lock.json` bug was hit and worked around: killing the
+  sweep subprocess directly (rather than through its own completion path)
+  left the lock file frozen at `"status": "running"` forever, so
+  `dashboard/app.py`'s `/run-sweep` route refused to start a new one.
+  Fixed by deleting the lock file before restarting. Worth a real fix
+  later (e.g. checking the PID is actually alive, not just trusting the
+  file's `status` field) if this comes up again.
+
+## Next up (not started — pick up here)
+
+Two new dashboard sub-pages, requested but not yet built:
 - **`/profile`** — a bank of application-question prompts mapped to the
   user's own stock answers, reusable across ATS auto-fill instead of
   re-answering the same custom questions per posting.
@@ -411,30 +509,17 @@ brainstormed field list (below) is settled first:
   auto-fill that don't have an answer yet. Likely data source: the
   `applications.notes` field, where every `ats/*.py` handler already logs
   unanswerable custom questions into `needs_review` (see e.g.
-  `ats/greenhouse.py`) — this would surface that same data as an actionable
-  list instead of it just sitting in the DB.
-Front-end build (actually wiring these into the dashboard so answers can be
-entered) comes after the field-list brainstorm below is used to inform what
-kinds of prompts/fields to expect.
+  `ats/greenhouse.py`, `ats/ashby.py`, `ats/teamtailor.py`) — this would
+  surface that same data as an actionable list instead of it just sitting
+  in the DB.
 
-**Field brainstorm for applied physics** (requested 2026-08-26, to guide
-both future discovery sources and what `/profile` should anticipate).
-Already covered by an existing source: aerospace/defense (Boeing, Lockheed,
-Northrop, GD, Anduril, SpaceX, ClearanceJobs), the 17 DOE national labs,
-quantum computing (IonQ, Rigetti, PsiQuantum, Quantinuum, Atom Computing),
-general/academic physics (APS, Physics Today, Physics World — includes
-CERN and faculty postings), and federal government broadly (USAJobs). NOT
-yet covered — candidate fields for a future discovery-source batch:
-semiconductors/microelectronics, photonics & optics, renewable/clean
-energy & fusion startups, advanced nuclear (fission/fusion beyond the DOE
-labs), medical physics & biophysics, materials science, quantitative
-finance ("quant" — physics grads are heavily recruited by trading firms),
-metrology/instrumentation, geophysics & oil/gas, telecom & RF engineering,
-acoustics, robotics/automation/controls, automotive & autonomous-vehicle
-sensors (LIDAR), the broader satellite/space industry beyond the majors,
-cryogenics & superconducting tech, additive manufacturing, patent
-law/technical IP consulting, science policy & regulation (NIST, NRC, FCC,
-FDA), atmospheric/climate science (NOAA), and STEM education/outreach.
+Remaining candidate fields from the original brainstorm not yet covered by
+a dedicated discovery source (NOAA/NIST/NRC/FCC/FDA were all separately
+investigated and resolved — see Session 5 above, either already covered by
+`usajobs.py` or given a real scraper): telecom & RF engineering
+specifically (as distinct from the semiconductor/photonics companies
+already added), patent law/technical IP consulting, and STEM
+education/outreach.
 
 ## What this project is
 
@@ -455,22 +540,27 @@ this is fully working now, don't redo the setup). Renamed from `job-bot`/
 branding) — GitHub redirects the old repo URL automatically, so existing
 clones/links still resolve.
 
-## Current real state (verified 2026-08-26, commit `ae928e1`)
+## Current real state (verified 2026-08-27, commit `3e54142`)
 
-- **38 discovery sources wired into `main.py`'s `VALID_SITES`** (up from 21
-  at the start of Session 4): 4 general aggregators (indeed, ziprecruiter,
-  usajobs, clearancejobs), 3 physics-specific boards (aps, physicstoday,
-  physicsworldjobs), 17 national labs, and 11 individual companies
-  (quantinuum, ionq, anduril, psiquantum, boeing, draper, northrop_grumman,
-  lockheed_martin, general_dynamics, mitre, spacex).
-- **A full sweep across all sources/modes was kicked off** — check
-  `dashboard/.sweep_lock.json` for whether it's still running or done by the
-  time you read this, and note it may need a second follow-up run: the 8
-  sources added last (clearancejobs, boeing, draper, northrop_grumman,
-  lockheed_martin, general_dynamics, mitre, spacex) were wired in *after*
-  that sweep started, so they weren't part of its site list. Job count was
-  **4,938 and climbing** (still on local mode) the last time this was
-  checked — don't trust that specific number, query `db/jobs.db` fresh.
+- **93 discovery sources wired into `main.py`'s `VALID_SITES`** (up from 21
+  at the start of Session 4, 38 at the start of Session 6). See Session 6
+  above for the full sector-by-sector breakdown of what got added.
+- **A full sweep across all 93 sources/3 modes is running** — check
+  `dashboard/.sweep_lock.json` for current status. It's genuinely slow (30+
+  min and counting for local mode alone) because many of the new company
+  sources do a per-result detail-page fetch on top of the search request —
+  confirmed still alive and making real network requests each time this was
+  checked, not stuck. If `.sweep_lock.json` says `"status": "running"` but
+  `ps aux | grep run_sweep_bg` shows no matching process, the lock file is
+  stale (this happened once already this session after killing an older
+  sweep directly instead of letting it finish) — delete
+  `dashboard/.sweep_lock.json` before trying to start a new one, or
+  `/run-sweep` will refuse with a silent redirect.
+- Two ATS platforms newly confirmed genuinely gate-free and wired into
+  `EASY_APPLY_PLATFORMS`: **Ashby** (`ats/ashby.py`) and **Teamtailor**
+  (`ats/teamtailor.py`) — both live-verified against real postings
+  (Helion Energy, Bluefors) with no account-creation gate and no
+  form-blocking CAPTCHA. 15 ATS platforms recognized now, up from 13.
 - Dashboard running at **http://127.0.0.1:5151** (restart with
   `cd ~/Desktop/retiarius && source venv/bin/activate && python dashboard/app.py`
   if it's not up). Two pages: **`/`** (home — pick sites/modes, launch a
