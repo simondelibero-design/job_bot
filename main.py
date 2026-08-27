@@ -71,6 +71,7 @@ from scrapers.lumentum import search_lumentum
 from scrapers.markforged import search_markforged
 from scrapers.maxar import search_maxar
 from scrapers.micron import search_micron
+from scrapers.microvision import search_microvision
 from scrapers.mitre import search_mitre
 from scrapers.mks_instruments import search_mks_instruments
 from scrapers.national_instruments import search_national_instruments
@@ -153,6 +154,7 @@ VALID_SITES = {
     "ouster", "waymo", "rocket_lab", "sierra_space", "firefly_aerospace",
     "planet_labs", "maxar", "iridium", "viasat",
     "bluefors", "oxford_instruments", "stratasys", "markforged",
+    "microvision",
 }
 
 
@@ -812,6 +814,13 @@ def _run_sweep(keywords: list[str], location_query: str, radius: int, mode: str,
                 found_this_keyword += search_markforged(keyword)
             except Exception as e:
                 print(f"  markforged search failed for '{keyword}': {e}")
+
+        if "microvision" in sites:
+            print(f"[{mode}][microvision] searching: {keyword}")
+            try:
+                found_this_keyword += search_microvision(keyword)
+            except Exception as e:
+                print(f"  microvision search failed for '{keyword}': {e}")
 
         for job in found_this_keyword:
             result = score_job(

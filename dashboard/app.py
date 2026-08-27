@@ -48,7 +48,7 @@ ENERGY_NUCLEAR_SITES = ["commonwealth_fusion", "form_energy", "helion", "kairos_
 MEDICAL_MATERIALS_SITES = ["corning", "dupont", "ge_healthcare", "philips", "siemens_healthineers", "three_m"]
 QUANT_METROLOGY_SITES = ["deshaw", "jane_street", "jump_trading", "national_instruments", "two_sigma"]
 INDUSTRIAL_SITES = ["abb", "boston_dynamics", "bose", "halliburton", "rockwell_automation", "slb"]
-SPACE_AUTOMOTIVE_SITES = ["firefly_aerospace", "iridium", "maxar", "ouster", "planet_labs", "rocket_lab", "sierra_space", "viasat", "waymo"]
+SPACE_AUTOMOTIVE_SITES = ["firefly_aerospace", "iridium", "maxar", "microvision", "ouster", "planet_labs", "rocket_lab", "sierra_space", "viasat", "waymo"]
 CRYO_ADDITIVE_SITES = ["bluefors", "markforged", "oxford_instruments", "stratasys"]
 VALID_SITES = (
     GENERAL_SITES + NATIONAL_LAB_SITES + OTHER_NATIONAL_LAB_SITES + COMPANY_SITES
