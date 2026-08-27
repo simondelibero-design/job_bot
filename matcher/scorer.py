@@ -57,12 +57,15 @@ def priority_score(score: float, tier: str | None) -> float:
     return score + bonus
 
 
-def _phd_and_sector_pass(text: str) -> dict | None:
+def _phd_and_sector_pass(text: str, title: str = "") -> dict | None:
     """Runs the shared EXCLUDE_KEYWORDS + three-tier PhD system + sector
     scoring, common to every search mode. Returns a completed result dict if
     the job is hard-excluded or PhD-flagged (semi/likely) — those outcomes
     are mode-independent — or None if the caller still needs to apply its
-    own mode-specific relevance gate to score/matched."""
+    own mode-specific relevance gate to score/matched.
+
+    `title` is used only for the seniority check below — everything else
+    still matches against the combined title+snippet `text`."""
     for term in EXCLUDE_KEYWORDS:
         if term.lower() in text:
             return {"score": 0.0, "matched": [f"excluded: {term}"], "excluded": True, "phd_flag": None}
@@ -86,11 +89,20 @@ def _phd_and_sector_pass(text: str) -> dict | None:
             phd_reason = f"mentions PhD: \"...{text[start:end].strip()}...\""
 
     if phd_flag is None:
-        m = _SENIORITY_RE.search(text)
+        # Title only, not the combined title+snippet `text` — confirmed
+        # live 2026-08-27 that matching against the snippet too was wildly
+        # over-broad for common words like "manager"/"staff"/"director"
+        # (9,067 of 13,355 jobs got excluded on the first attempt, since
+        # those words show up constantly in generic descriptive text —
+        # "reports to the Engineering Manager", "join our staff", etc. —
+        # not just in a posting's own title indicating its own level). The
+        # title is a much more reliable, deliberate signal for what this
+        # specific job actually is.
+        m = _SENIORITY_RE.search(title)
         if m:
             phd_flag = "likely_excluded"
-            start, end = max(m.start() - 20, 0), min(m.end() + 20, len(text))
-            phd_reason = f"seniority term: \"...{text[start:end].strip()}...\""
+            start, end = max(m.start() - 20, 0), min(m.end() + 20, len(title))
+            phd_reason = f"seniority term in title: \"...{title[start:end].strip()}...\""
 
     score = 0.0
     matched = []
@@ -128,7 +140,7 @@ def score_job(title: str, snippet: str = "", location: str | None = None,
 
     salary_annual_est = parse_salary_annual(salary)
 
-    shared = _phd_and_sector_pass(text)
+    shared = _phd_and_sector_pass(text, title=title)
     if shared is not None:
         shared["distance_miles"] = distance_miles
         shared["tier"] = tier

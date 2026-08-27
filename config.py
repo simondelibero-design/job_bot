@@ -286,13 +286,28 @@ PHD_PREFERRED_KEYWORDS = [
 # low-priority "flagged but still visible, one-click Restore" bucket instead
 # of building a separate one). Matched whole-word, case-insensitive, only
 # checked if the job wasn't already PhD-flagged above.
-# Real false-positive risk on two of these, given this user's fields: "lead"
+# Real false-positive risk on some of these, given this user's fields: "lead"
 # also means the metal (lead-free, lead paint testing, lead time — plausible
 # in materials/environmental postings), and "sr" collides with unrelated
 # abbreviations (SR-71, State Route — plausible in aerospace/defense
 # postings). Watch the likely_excluded tab and Restore anything caught by
 # mistake rather than assuming the filter is always right.
-SENIORITY_EXCLUDE_KEYWORDS = ["head", "lead", "senior", "sr", "chief"]
+#
+# manager/director/principal/staff/vp/executive added 2026-08-27 after a
+# real miss: "Manager of Process Engineering" (PsiQuantum, requiring a
+# Master's degree + 10+ years experience) scored 36 and reached the top of
+# the priority queue for a B.S. candidate with no professional experience
+# — none of the original 5 words caught it. Job description text isn't a
+# reliable place to catch this instead: `snippet` is truncated to 1000
+# chars across most scrapers, and a posting's actual degree/experience
+# requirements routinely appear well past that cutoff (confirmed on this
+# exact posting) — the title is the only field guaranteed not to be cut
+# off, hence catching seniority here instead of trying to regex the
+# description for "10+ years"/"Master's degree required" style phrases.
+SENIORITY_EXCLUDE_KEYWORDS = [
+    "head", "lead", "senior", "sr", "chief",
+    "manager", "director", "principal", "staff", "vp", "vice president", "executive",
+]
 
 MIN_SCORE_TO_QUEUE = 3  # kept for the "far" distance tier's threshold
 
