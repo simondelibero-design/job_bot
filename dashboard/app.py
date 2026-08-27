@@ -125,6 +125,13 @@ def home():
 def save_distance_settings():
     settings = {}
     for key, default in DEFAULT_DISTANCE_SETTINGS.items():
+        if key == "include_international":
+            # A checkbox, not a number — unchecked boxes are omitted from
+            # form data entirely (not sent as "false"), so presence in the
+            # submitted form is the actual signal, same as every plain HTML
+            # checkbox in this project's forms.
+            settings[key] = "include_international" in request.form
+            continue
         try:
             value = float(request.form.get(key, default))
         except (TypeError, ValueError):

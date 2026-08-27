@@ -20,6 +20,15 @@ DEFAULT_DISTANCE_SETTINGS = {
     # but every tier is independently adjustable — there's nothing stopping
     # you from weighting "far" above "close" if that's ever what you want.
     "close_weight": 40, "mid_weight": 30, "far_weight": 20, "life_change_weight": 10,
+    # Off by default — confirmed live 2026-08-27 that hundreds of jobs from
+    # company-specific ATS boards (Greenhouse/Lever/Eightfold/etc., which
+    # have no location/country filter param at all) were international
+    # postings sitting in the active queue with nothing filtering them out.
+    # See matcher/location.py. Toggling this on also raises the life-change
+    # radius slider's max in the dashboard (see home.html) — a domestic
+    # relocation radius doesn't mean much once international postings are
+    # in scope.
+    "include_international": False,
 }
 MAX_PROXIMITY_BONUS = 10  # comparable to the top SECTOR_WEIGHTS entries (quantum, particle accelerator: 10)
 
@@ -72,6 +81,10 @@ DISTANCE_TIERS = [
 # actual parameter Indeed/ZipRecruiter's search API takes. User-adjustable
 # from the dashboard, same mechanism as the tiers above.
 LIFE_CHANGE_SEARCH_RADIUS_MILES = _distance_settings["life_change_radius_miles"]
+
+# See matcher/location.py — when False (default), any job whose location
+# resolves to a non-US country is hard-excluded regardless of search mode.
+INCLUDE_INTERNATIONAL = _distance_settings["include_international"]
 
 # Keyed by the same tier-name strings score_job() already produces: "close"/
 # "mid"/"far" for local-mode jobs, "life_change" for that mode (which tags

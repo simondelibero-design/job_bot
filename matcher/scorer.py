@@ -5,11 +5,12 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from config import (
-    DISTANCE_TIERS, EXCLUDE_KEYWORDS, LIFE_CHANGE_MIN_SALARY, LIFE_CHANGE_MIN_SCORE,
-    MAX_PROXIMITY_BONUS, PHD_PREFERRED_KEYWORDS, PHD_REQUIRED_KEYWORDS, REMOTE_MIN_SCORE,
-    SECTOR_WEIGHTS, SENIORITY_EXCLUDE_KEYWORDS, TIER_WEIGHTS,
+    DISTANCE_TIERS, EXCLUDE_KEYWORDS, INCLUDE_INTERNATIONAL, LIFE_CHANGE_MIN_SALARY,
+    LIFE_CHANGE_MIN_SCORE, MAX_PROXIMITY_BONUS, PHD_PREFERRED_KEYWORDS, PHD_REQUIRED_KEYWORDS,
+    REMOTE_MIN_SCORE, SECTOR_WEIGHTS, SENIORITY_EXCLUDE_KEYWORDS, TIER_WEIGHTS,
 )
 from matcher.distance import estimate_distance_miles
+from matcher.location import is_us_location
 from matcher.salary import parse_salary_annual
 
 _PHD_MENTION_RE = re.compile(r"\bph\.?\s?d\.?\b", re.I)
@@ -57,15 +58,30 @@ def priority_score(score: float, tier: str | None) -> float:
     return score + bonus
 
 
-def _phd_and_sector_pass(text: str, title: str = "") -> dict | None:
-    """Runs the shared EXCLUDE_KEYWORDS + three-tier PhD system + sector
-    scoring, common to every search mode. Returns a completed result dict if
-    the job is hard-excluded or PhD-flagged (semi/likely) — those outcomes
-    are mode-independent — or None if the caller still needs to apply its
-    own mode-specific relevance gate to score/matched.
+def _phd_and_sector_pass(text: str, title: str = "", location: str | None = None) -> dict | None:
+    """Runs the shared international/EXCLUDE_KEYWORDS + three-tier PhD
+    system + sector scoring, common to every search mode. Returns a
+    completed result dict if the job is hard-excluded or PhD-flagged
+    (semi/likely) — those outcomes are mode-independent — or None if the
+    caller still needs to apply its own mode-specific relevance gate to
+    score/matched.
 
-    `title` is used only for the seniority check below — everything else
-    still matches against the combined title+snippet `text`."""
+    `title` is used only for the seniority check below; `location` only
+    for the international check. Everything else still matches against
+    the combined title+snippet `text`."""
+    if not INCLUDE_INTERNATIONAL and not is_us_location(location):
+        # Checked before EXCLUDE_KEYWORDS/PhD/seniority — a location-based
+        # gate, not a text-based one, and cheap enough to always run first.
+        # See matcher/location.py for why this exists: company-specific ATS
+        # boards (Greenhouse/Lever/Eightfold/etc.) have no country filter
+        # param at all, so a lot of international postings were sitting in
+        # the active queue with nothing filtering them out (confirmed live
+        # 2026-08-27 — hundreds of jobs across dozens of countries).
+        return {
+            "score": 0.0, "matched": ["excluded: international posting"], "excluded": True,
+            "phd_flag": None,
+        }
+
     for term in EXCLUDE_KEYWORDS:
         if term.lower() in text:
             return {"score": 0.0, "matched": [f"excluded: {term}"], "excluded": True, "phd_flag": None}
@@ -140,7 +156,7 @@ def score_job(title: str, snippet: str = "", location: str | None = None,
 
     salary_annual_est = parse_salary_annual(salary)
 
-    shared = _phd_and_sector_pass(text, title=title)
+    shared = _phd_and_sector_pass(text, title=title, location=location)
     if shared is not None:
         shared["distance_miles"] = distance_miles
         shared["tier"] = tier

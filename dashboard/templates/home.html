@@ -71,6 +71,9 @@
   .dist-hint { font-size: 12px; color: var(--muted); margin: -4px 0 14px; }
   .unit-toggle { display: flex; gap: 14px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
   .unit-toggle label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .intl-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted);
+                 cursor: pointer; margin-bottom: 14px; }
+  .intl-toggle input { accent-color: var(--accent); }
   .weight-row { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); }
   .weight-layout { display: flex; gap: 18px; align-items: center; }
   .pie-wrap { flex-shrink: 0; }
@@ -117,6 +120,12 @@
           <label><input type="radio" name="_display_unit" value="km" onchange="setDistUnit('km')"> Kilometers</label>
         </div>
         <form method="post" action="{{ url_for('save_distance_settings') }}" id="distance-form">
+          <label class="intl-toggle" title="Off by default — company-specific job boards often have no country filter, so international postings need to be explicitly opted into.">
+            <input type="checkbox" name="include_international" id="include-international"
+                   {% if distance.get('include_international') %}checked{% endif %}
+                   onchange="onIncludeInternationalChange()">
+            Include international postings (also raises the Life-change radius max)
+          </label>
           {% for key, label in [
             ('close_max_miles', 'Close'), ('mid_max_miles', 'Medium Far'),
             ('far_max_miles', 'Far'), ('life_change_radius_miles', 'Life-change'),
@@ -391,7 +400,13 @@
   // right before the form actually submits.
   var KM_PER_MILE = 1.609344;
   var DIST_KEYS = ['close_max_miles', 'mid_max_miles', 'far_max_miles', 'life_change_radius_miles'];
-  var BASE_MAX_MILES = { close_max_miles: 100, mid_max_miles: 100, far_max_miles: 100, life_change_radius_miles: 500 };
+  var LIFE_CHANGE_MAX_DOMESTIC = 500;
+  // ~12,450 miles covers any two points on Earth (half the planet's
+  // circumference) — the point isn't precision, it's letting the slider
+  // express "anywhere in the world" once international postings are in
+  // scope, since a domestic-scale 500mi cap doesn't mean much for that.
+  var LIFE_CHANGE_MAX_INTERNATIONAL = 12500;
+  var BASE_MAX_MILES = { close_max_miles: 100, mid_max_miles: 100, far_max_miles: 100, life_change_radius_miles: LIFE_CHANGE_MAX_DOMESTIC };
   var currentUnit = 'mi';
   var milesValues = {};
 
@@ -436,6 +451,24 @@
     });
     document.querySelectorAll('.dist-unit-label').forEach(function(el) { el.textContent = currentUnit; });
   }
+
+  window.onIncludeInternationalChange = function() {
+    var checked = document.getElementById('include-international').checked;
+    BASE_MAX_MILES.life_change_radius_miles = checked ? LIFE_CHANGE_MAX_INTERNATIONAL : LIFE_CHANGE_MAX_DOMESTIC;
+    // Only push the value itself up when switching TO international and
+    // the current value is still at (or below) the old domestic cap —
+    // never silently shrinks a value the user already set.
+    if (checked && milesValues.life_change_radius_miles <= LIFE_CHANGE_MAX_DOMESTIC) {
+      milesValues.life_change_radius_miles = LIFE_CHANGE_MAX_DOMESTIC;
+    }
+    renderAll();
+  };
+  // Reflect the saved setting immediately on page load, not just after
+  // the checkbox is manually toggled.
+  if (document.getElementById('include-international').checked) {
+    BASE_MAX_MILES.life_change_radius_miles = LIFE_CHANGE_MAX_INTERNATIONAL;
+  }
+  renderAll();
 
   window.setDistUnit = function(unit) {
     currentUnit = unit;
