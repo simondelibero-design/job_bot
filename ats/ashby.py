@@ -60,9 +60,25 @@ _SYSTEM_TEXT_FIELDS = {
 
 
 def fill_application(page: Page, resume: dict) -> dict:
-    """Fills known fields on an Ashby application page already loaded in
-    `page`. Returns {"platform": "ashby", "needs_review": [...]}."""
+    """Fills known fields on a real Ashby job page (`jobs.ashbyhq.com/{org}/{id}`)
+    or its `.../application` form directly. Returns
+    {"platform": "ashby", "needs_review": [...]}.
+
+    Bug found live 2026-08-27, running the real prepare_application()
+    pipeline against a fresh queue job rather than a hand-driven test: the
+    job URL discovery actually stores (and ats/apply.py navigates to) is
+    the listing page, one click before the form — this function used to
+    assume it was already on `.../application` (true only because the
+    original verification script clicked through manually before calling
+    this function, which the real pipeline never does). Now clicks
+    "Apply for this Job" itself first if the form isn't already present."""
     entries = page.query_selector_all(".ashby-application-form-field-entry")
+    if not entries:
+        apply_link = page.query_selector("a[href*='/application']")
+        if apply_link:
+            apply_link.click()
+            page.wait_for_timeout(1500)
+            entries = page.query_selector_all(".ashby-application-form-field-entry")
     if not entries:
         return {
             "platform": "ashby",

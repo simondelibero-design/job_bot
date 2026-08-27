@@ -80,7 +80,21 @@ def prepare_application(job_id: int, job_url: str, resume: dict, headless: bool 
             set_application_status(job_id, "needs_review", notes=f"Unknown ATS platform for {job_url}")
             return {"platform": "unknown", "needs_review": ["Unrecognized ATS — apply manually"]}
 
-        result = handler(page, resume)
+        try:
+            result = handler(page, resume)
+        except Exception as e:
+            # A handler bug (changed page layout, a slow/missing element,
+            # etc.) must never crash the whole apply flow silently — that
+            # leaves the job stuck at "discovered" forever with zero
+            # feedback. Report it honestly instead, same as every other
+            # "couldn't reach the form" case each handler already surfaces
+            # itself. Found live 2026-08-27: a Corning posting's
+            # SuccessFactors flow hit a 30s element-click timeout that
+            # propagated all the way up uncaught before this fix.
+            result = {
+                "platform": platform,
+                "needs_review": [f"{platform} handler failed ({type(e).__name__}) — apply manually: {e}"],
+            }
         browser.close()
 
     notes = "; ".join(result["needs_review"]) if result["needs_review"] else "Auto-filled, ready to review"
@@ -104,9 +118,15 @@ def prepare_and_open(job_id: int, job_url: str, resume: dict):
         handler = HANDLERS.get(platform)
 
         if handler:
-            result = handler(page, resume)
-            notes = "; ".join(result["needs_review"]) if result["needs_review"] else "Auto-filled, ready to review"
-            needs_review = result["needs_review"]
+            try:
+                result = handler(page, resume)
+                needs_review = result["needs_review"]
+            except Exception as e:
+                # See prepare_application()'s matching fix — a handler crash
+                # must not silently kill the browser window before the user
+                # ever gets to see it or find out what happened.
+                needs_review = [f"{platform} handler failed ({type(e).__name__}) — apply manually: {e}"]
+            notes = "; ".join(needs_review) if needs_review else "Auto-filled, ready to review"
         else:
             notes = f"Unrecognized ATS platform — fill out manually ({job_url})"
             needs_review = None

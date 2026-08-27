@@ -39,6 +39,21 @@ def fill_application(page: Page, resume: dict) -> dict:
 
 
 def _click_if_present(page: Page, selector: str):
+    """Best-effort click — swallows the failure instead of hanging on
+    Playwright's default 30s actionability wait. Found live 2026-08-27 on a
+    real Corning posting: this platform's Jobs2Web template (see
+    scrapers/_successfactors.py's docstring) duplicates markup 2-3x per page
+    for responsive desktop/tablet/mobile variants, so a broad multi-match
+    selector like this one can land on a hidden variant first in DOM order
+    — `.click()` then waits the full default timeout for it to become
+    visible, which it never will on this viewport. Clicking Apply here is
+    inherently best-effort (the handler falls back to an honest "didn't
+    match known pattern" report either way), so a short explicit timeout
+    that fails fast is strictly better than a 30s hang that used to
+    propagate as an uncaught exception and crash the whole apply flow."""
     el = page.query_selector(selector)
     if el:
-        el.click()
+        try:
+            el.click(timeout=3000)
+        except Exception:
+            pass
