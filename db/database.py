@@ -207,17 +207,54 @@ def delete_profile_answer(answer_id: int):
         conn.execute("DELETE FROM profile_answers WHERE id = ?", (answer_id,))
 
 
+def _normalize_prompt(prompt: str) -> str:
+    """Strips whitespace and a trailing required-field asterisk before
+    comparing two prompt strings. Confirmed live 2026-08-27: the identical
+    question ("Are you legally authorized to work in the United States?")
+    was saved once without a trailing "*" but showed up on a later SpaceX
+    posting with one (Greenhouse sometimes bakes the required-marker "*"
+    into the extracted label text and sometimes doesn't, depending on the
+    posting's own markup) — an exact-text match missed it even though it's
+    obviously the same question. Stored prompt text itself is left
+    untouched (profile_answers.prompt is still the real UNIQUE key); this
+    normalization only applies where two prompts get compared."""
+    return prompt.strip().rstrip("*").strip()
+
+
+def lookup_profile_answer(prompt: str) -> str | None:
+    """Match against a previously saved profile_answers.prompt, ignoring a
+    trailing required-field "*" and surrounding whitespace (see
+    _normalize_prompt) — same matching semantics as
+    list_unanswered_prompts()'s `answered` set, so a question answered once
+    (via /profile or /struggles-to-answer) gets silently reused by
+    ats/*.py handlers on every future application that asks the same
+    prompt text, instead of being re-flagged forever."""
+    if not prompt:
+        return None
+    target = _normalize_prompt(prompt)
+    if not target:
+        return None
+    with get_conn() as conn:
+        rows = conn.execute("SELECT prompt, answer FROM profile_answers").fetchall()
+    for row in rows:
+        if _normalize_prompt(row["prompt"]) == target:
+            return row["answer"]
+    return None
+
+
 def list_unanswered_prompts() -> list[dict]:
     """Every distinct prompt string surfaced in some job's
     applications.needs_review_json that doesn't already have a matching
-    row in profile_answers (exact-text match). Returns one entry per
-    distinct prompt, with a count of how many jobs hit it and one example
-    job for context — not one row per job, since the same custom question
-    (e.g. "Are you eligible to work in the U.S.?") shows up on many
-    postings on the same ATS platform."""
+    row in profile_answers (see _normalize_prompt for what "matching"
+    tolerates — a trailing required-field "*" and surrounding whitespace).
+    Returns one entry per distinct prompt, with a count of how many jobs
+    hit it and one example job for context — not one row per job, since
+    the same custom question (e.g. "Are you eligible to work in the
+    U.S.?") shows up on many postings on the same ATS platform."""
     with get_conn() as conn:
         answered = {
-            row["prompt"] for row in conn.execute("SELECT prompt FROM profile_answers")
+            _normalize_prompt(row["prompt"])
+            for row in conn.execute("SELECT prompt FROM profile_answers")
         }
         rows = conn.execute(
             """
@@ -237,7 +274,7 @@ def list_unanswered_prompts() -> list[dict]:
                 continue
             for prompt in prompts:
                 prompt = prompt.strip()
-                if not prompt or prompt in answered:
+                if not prompt or _normalize_prompt(prompt) in answered:
                     continue
                 entry = by_prompt.setdefault(prompt, {
                     "prompt": prompt, "count": 0,

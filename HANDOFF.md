@@ -577,6 +577,136 @@ platform, all live-verified — not simulated.
   Oracle-hosted postings, national_instruments, quantumscape, etc.) — all
   correctly resolve to "unrecognized ATS" rather than silently failing.
 
+## Session 8 (2026-08-27): trust-verification pass, scoring/international fixes, resume-first autofill + saved-answer reuse
+
+Started with the user directly challenging whether this project is at the
+"unsupervised" stage yet — demanded live, visible proof instead of trusting
+returned Python dict values, after a PsiQuantum demo job turned out to
+require a Master's + 10 years (way outside scope) and the on-page fill
+state was invisible to a human looking at the actual browser window. Real,
+consequential fixes came directly out of taking that seriously:
+
+- **On-page review banner** (`ats/apply.py`'s `_inject_review_banner()`) —
+  `needs_review` used to only ever reach the database; a human looking at
+  the real `prepare_and_open()` browser window had no way to see it without
+  alt-tabbing to the dashboard. Now injected as a collapsible on-page badge
+  via `page.evaluate()`, safe even for unrecognized platforms.
+- **Greenhouse: two real bugs found by actually looking at a live opened
+  window** — a false "Resume/CV*" needs_review entry after a genuinely
+  successful upload (the `#resume` node gets swapped out by the page's own
+  JS right after upload; now tracked and filtered), and a garbled Cover
+  Letter label sweeping up an entire upload-button cluster's text.
+- **Seniority filter widened, then corrected mid-fix**: a real PsiQuantum
+  "Manager of Process Engineering" miss (Master's + 10yrs, nowhere near
+  scope) traced to `SENIORITY_EXCLUDE_KEYWORDS` missing "manager",
+  "director", "staff", etc. First attempt matched against the combined
+  title+snippet text (same pattern as the PhD check) and wrongly excluded
+  9,067 of 13,355 jobs — caught before shipping, restricted to title-only
+  matching instead (`matcher/scorer.py`), re-verified (8,418 flagged total,
+  4,128 specifically via seniority-in-title — plausible for this pool).
+- **International-posting filter, with a user-facing toggle** — discovered
+  that most company-specific ATS scrapers (Greenhouse/Lever/Eightfold/etc.)
+  pull entire global job boards with zero country param, so hundreds of
+  non-US postings across dozens of countries were sitting unfiltered in the
+  active queue. New `matcher/location.py` (`is_us_location()`, deliberately
+  a blocklist not a whitelist — missing/unresolvable location defaults to
+  US rather than risking a false exclude; a naive "mexico" match had to be
+  guarded with a lookbehind so "New Mexico" isn't misclassified). Wired in
+  as a hard-exclude gate in `matcher/scorer.py`, gated behind a new
+  "Include international postings" checkbox on the dashboard home page
+  (default off), which also scales the life_change radius slider's max
+  (500mi domestic → 12,500mi international). Active queue went from
+  ~13,300 to 4,173 with the toggle off (current default).
+- **Resume-first native-autofill, with our own fill as backup** — the user
+  asked for the apply flow to default to attaching the resume and letting
+  each platform's own parser autofill fields first, with per-field filling
+  only as a fallback. Confirmed live on a real Digital Biotechnologies
+  (Ashby) posting that this is a genuine platform feature, not a guess:
+  Ashby has a dedicated "Autofill from resume" dropzone, separate from the
+  real resume upload field, that parses the file server-side and
+  autofills name/phone/email itself. `ats/greenhouse.py`, `ats/lever.py`,
+  and `ats/ashby.py` all reordered to upload the resume (and, for Ashby,
+  trigger the dedicated autofill dropzone) *before* any other field, wait
+  for the native reaction, then only `.fill()` a field if it's still empty
+  — so a genuine native autofill always wins. Found and fixed a real bug
+  while verifying this live: the parsed-resume autofill fully re-renders
+  Ashby's form (React remount), which detaches every previously-grabbed
+  ElementHandle including the cached `entries` list — now re-queried after
+  the autofill settles. Also found and fixed a second real bug on the same
+  live run: this Ashby org splits First/Last Name into separate fields,
+  which repurposes `_systemfield_name` to mean "First Name" only and gives
+  "Last Name"/"Phone Number" ordinary random-UUID ids identical to a custom
+  question — the old id-based fill would have silently written the full
+  name into a field labeled "First Name". Fixed by matching name/phone/
+  LinkedIn generically by each entry's own question-title label text
+  instead of assumed fixed ids (see `ats/ashby.py`'s docstring). Verified
+  with real before/after screenshots (`fill_application()` run directly
+  via Playwright against live postings, not simulated) — all core fields
+  landed correctly, the two genuinely unanswerable questions (Cover
+  Letter, Desired Salary/relocation/sponsorship-with-no-saved-answer) were
+  correctly left for review.
+- **Saved-answer reuse across future applications** — `db/database.py`'s
+  `profile_answers` table (23 real saved answers) already existed from
+  Session 7's `/profile` and `/struggles-to-answer` pages, but no handler
+  actually checked it before flagging a question as needs_review, so the
+  same question got re-flagged forever even after being answered once.
+  New `lookup_profile_answer(prompt)` (exact-text match, same semantics as
+  the existing unanswered-prompt matching) is now checked by
+  `ats/greenhouse.py`, `ats/lever.py`, and `ats/ashby.py` before flagging
+  any required field — a plain text/textarea field gets `.fill()`'d
+  directly, a `<select>` gets `.select_option(label=...)`, an Ashby Yes/No
+  button pair gets clicked by matching button text, and a Greenhouse
+  ARIA-combobox gets a best-effort click+type+select-matching-option
+  attempt that safely falls through to needs_review (not a false claim) if
+  no matching option appears. `ats/apply.py`'s on-page banner now shows
+  "✓ reused saved answer — ..." lines ahead of real needs_review items, so
+  it's visible when this is actually happening, not just a database-only
+  effect. Live-verified on a real, nearby Anduril (Greenhouse) posting —
+  correctly left the one un-matched combobox question for review rather
+  than mis-filling it.
+- **Live browser-pane pass through real jobs within 50 miles** (per the
+  user's explicit ask to watch this happen, not just read results): Boeing
+  Workday posting (Kent, WA, 10mi) — confirmed live that even "Autofill
+  with Resume" drops straight into the same universal account-creation
+  wall documented in Session 7, correctly left for manual review, no
+  account created. An Amazon.jobs posting (Bellevue, 25mi, sourced via an
+  Indeed tracking link) turned out to be already expired/unavailable —
+  normal aggregator staleness, not a bug. A General Dynamics posting
+  (Seattle, 25mi) revealed a real, previously-unknown gap: `gd.com/careers`
+  is a branded landing page that only reveals the real ATS
+  (`gdit.wd5.myworkdayjobs.com`, Workday) after an in-page "Apply Now"
+  button click, not an HTTP redirect — `detect_platform()` never sees it
+  and wrongly reports "unrecognized ATS." Flagged as a follow-up task, not
+  fixed this session (`ats/apply.py`'s `_navigate_and_detect()` would need
+  a click-and-recheck fallback, same shape as the existing tracking-link
+  URL-resolution fix, generalized to more company career-page domains).
+- **Two more real bugs found live on a fresh SpaceX (Greenhouse) posting**,
+  working the actual queue rather than diagnostic-testing it: (1) a saved
+  profile_answers prompt didn't match the identical on-page question
+  because Greenhouse sometimes bakes a trailing required-field "*" into
+  the extracted label text and sometimes doesn't — fixed with
+  `db/database.py`'s new `_normalize_prompt()` (strips a trailing "*" and
+  whitespace before comparing), applied in both `lookup_profile_answer()`
+  and `list_unanswered_prompts()`. (2) Greenhouse's real geocoded
+  `Location (City)` field (`#candidate-location`) never had any fill logic
+  at all — `ats/greenhouse.py`'s new `_fill_location_combobox()` types
+  "Milton, WA" and clicks the matching "...United States" suggestion;
+  verified live with a screenshot (city correctly resolved, not just
+  typed text).
+- **Deliberately NOT auto-answered, and not yet built — come back to
+  this**: SpaceX's "Are you legally authorized to work in the United
+  States?" question offers full-sentence options ("I am authorized to
+  work in the United States for any employer" / "...for my present
+  employer only" / "I require sponsorship..." / etc.), not a plain
+  Yes/No — the saved answer "Yes." doesn't map onto any of them by exact
+  or normalized text matching, and guessing wrong would misstate real
+  work-authorization status on a real application. User's explicit call
+  (2026-08-27): leave these as manual for now rather than build a
+  semantic/fuzzy mapper without deciding how it should pick first — but
+  this is a real, recurring gap (same likely true of "Citizenship Status"
+  and any other multi-option custom question phrased differently
+  per-employer) worth a real design pass later, not a one-off patch.
+
 ## Next up (not started — pick up here)
 
 Remaining candidate fields from the original brainstorm not yet covered by
@@ -611,11 +741,16 @@ this is fully working now, don't redo the setup). Renamed from `job-bot`/
 branding) — GitHub redirects the old repo URL automatically, so existing
 clones/links still resolve.
 
-## Current real state (verified 2026-08-27, commit `b0aa111`)
+## Current real state (verified 2026-08-27, commit `c830c45` + Session 8's uncommitted apply-pipeline work)
 
-- **13,169 jobs in `db/jobs.db`** as of this commit — check yourself,
-  the full sweep from Session 6 was still running/growing throughout
-  Session 7. `ps aux | grep run_sweep_bg` to check if it's still alive.
+- **13,536 jobs total in `db/jobs.db`; 4,173 active (not excluded)** as of
+  this check — check yourself, the queue size moves with every rescore and
+  every sweep. The drop from ~13,300 to 4,173 active is mostly Session 8's
+  international-posting filter (default off) plus the corrected seniority
+  filter, not a discovery regression — see that session's notes.
+- **23 saved answers in `profile_answers`**, now actually reused by
+  `ats/greenhouse.py`, `ats/lever.py`, and `ats/ashby.py` (Session 8) —
+  previously database-only, never checked by a handler.
 - **93 discovery sources wired into `main.py`'s `VALID_SITES`** (up from 21
   at the start of Session 4, 38 at the start of Session 6). See Session 6
   above for the full sector-by-sector breakdown of what got added.
@@ -942,6 +1077,20 @@ Older items, still open from before this list:
   4's General Dynamics/MITRE scrapers (a gzip header byte mismatch, a static
   non-secret header value) — real interop, not evasion, and reasoned through
   explicitly rather than assumed.
+  **Re-confirmed the hard way, Session 8 (2026-08-27)**: resolved ~42
+  nearby Indeed `/rc/clk?jk=...` tracking links back-to-back in a single
+  automated loop (trying to find easy-apply platforms hiding behind them)
+  and got the home IP Cloudflare-blocked on indeed.com ("Request Blocked",
+  real Ray ID) — confirmed via screenshot, not assumed. Individual Indeed
+  links opened one at a time elsewhere in the same session worked fine
+  right up until this; it was specifically the automated *volume* that
+  tripped it, not something inherent to every single resolution. Stopped
+  immediately on discovery — no delay/retry/rotation attempted to work
+  around it. **Lesson for next time**: never resolve more than a
+  small handful of Indeed tracking links in one automated pass; if a
+  batch is genuinely needed, that's a sign to ask the user first rather
+  than assume it's safe, since this exact risk was already documented
+  above before it happened again.
 - **Never** auto-submit an application. Every ATS handler fills fields and
   stops; the human always does the final review and click.
 - **Never** handle the user's real credentials directly — not GitHub PATs,

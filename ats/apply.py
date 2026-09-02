@@ -4,12 +4,17 @@ project submits an application automatically. That's a deliberate design
 choice (see conversation/README): CAPTCHAs, custom screening questions, and
 the final submit click all require a human look before anything goes out.
 """
+import json
 import sys
+import tempfile
+import time
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
 from playwright.sync_api import sync_playwright
+
+LIVE_VIEW_DIR = Path(__file__).parent.parent / "dashboard" / ".live_view"
 
 from ats.detect import detect_platform
 from ats.greenhouse import fill_application as fill_greenhouse
@@ -105,6 +110,15 @@ def prepare_application(job_id: int, job_url: str, resume: dict, headless: bool 
     return result
 
 
+def _describe_auto_answered(auto_answered: list[str] | None) -> list[str]:
+    """Cosmetic prefix so the on-page banner reads as "reused from a saved
+    answer" rather than looking identical to a plain filled field — the
+    whole point of profile_answers is to save the user re-answering the
+    same custom question on every future application, so it should be
+    visible when that's actually happening."""
+    return [f"✓ reused saved answer — {item}" for item in (auto_answered or [])]
+
+
 def prepare_and_open(job_id: int, job_url: str, resume: dict):
     """Opens a real, visible browser window with the application pre-filled
     and leaves it open until the user closes it themselves. Meant to be run
@@ -112,9 +126,32 @@ def prepare_and_open(job_id: int, job_url: str, resume: dict):
     browser window closing rather than on stdin, since a subprocess launched
     from a web server has no interactive terminal to read from. The human
     reviews, solves any CAPTCHA, answers custom questions, and clicks submit
-    themselves; this script never does any of that."""
+    themselves; this script never does any of that.
+
+    Launched with a real remote-debugging port (via a per-job temp
+    `--user-data-dir`, whose `DevToolsActivePort` file Chromium writes on
+    startup) so `ats/watch_window.py` can attach over CDP afterward and
+    pull a live screenshot of this exact window — the user's own mouse/
+    keyboard control isn't affected by a second CDP client just reading
+    state, only by one sending input, which watch_window.py never does.
+    Solves a real, user-flagged gap: previously the only way to know what
+    was actually on screen was to ask the user or trust the database's
+    needs_review entry, with no way to independently check either."""
+    user_data_dir = Path(tempfile.mkdtemp(prefix=f"retiarius_live_{job_id}_"))
+    LIVE_VIEW_DIR.mkdir(parents=True, exist_ok=True)
+    state_path = LIVE_VIEW_DIR / f"{job_id}.json"
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        # A custom --user-data-dir is only accepted through
+        # launch_persistent_context(), not launch()+args (confirmed live
+        # 2026-08-27 — Playwright rejects the latter outright with a clear
+        # error telling you to use this instead). Returns a BrowserContext
+        # rather than a Browser, but exposes the same new_page()/close()
+        # surface this function already used.
+        browser = p.chromium.launch_persistent_context(
+            str(user_data_dir), headless=False, args=["--remote-debugging-port=0"],
+        )
+        _write_live_view_state(job_id, user_data_dir, state_path, job_url)
         page = browser.new_page()
         platform = _navigate_and_detect(page, job_id, job_url)
         handler = HANDLERS.get(platform)
@@ -123,15 +160,18 @@ def prepare_and_open(job_id: int, job_url: str, resume: dict):
             try:
                 result = handler(page, resume)
                 needs_review = result["needs_review"]
+                auto_answered = result.get("auto_answered", [])
             except Exception as e:
                 # See prepare_application()'s matching fix — a handler crash
                 # must not silently kill the browser window before the user
                 # ever gets to see it or find out what happened.
                 needs_review = [f"{platform} handler failed ({type(e).__name__}) — apply manually: {e}"]
+                auto_answered = []
             notes = "; ".join(needs_review) if needs_review else "Auto-filled, ready to review"
         else:
             notes = f"Unrecognized ATS platform — fill out manually ({job_url})"
             needs_review = ["No known ATS platform detected on this page — nothing was auto-filled. Fill out and submit manually."]
+            auto_answered = []
 
         set_application_status(job_id, "needs_review", ats_platform=platform, notes=notes,
                                 needs_review=needs_review)
@@ -142,29 +182,60 @@ def prepare_and_open(job_id: int, job_url: str, resume: dict):
         # Inject it directly onto the page as a visible on-screen banner
         # instead. Purely a visual overlay (no page fields touched, nothing
         # submitted) — safe to inject even for an unrecognized platform.
-        _inject_review_banner(page, platform, needs_review)
+        banner_items = _describe_auto_answered(auto_answered) + needs_review
+        _inject_review_banner(page, platform, banner_items, unanswered_count=len(needs_review))
 
         try:
             page.wait_for_event("close", timeout=0)
         except Exception:
             pass
         browser.close()
+        state_path.unlink(missing_ok=True)  # window's gone — stop advertising a dead port
 
 
-def _inject_review_banner(page, platform: str, needs_review: list[str] | None):
+def _write_live_view_state(job_id: int, user_data_dir: Path, state_path: Path, job_url: str):
+    """Waits for Chromium to write its DevToolsActivePort file (near-
+    instant, but not synchronous with launch() returning) and records the
+    resulting CDP port so ats/watch_window.py can attach to this exact
+    window later. Best-effort: if the port never shows up (an
+    unrecognized Chromium version, a sandboxing quirk), the window still
+    opens and works normally — it just won't be remotely viewable, same
+    as before this feature existed."""
+    port_file = user_data_dir / "DevToolsActivePort"
+    for _ in range(40):
+        if port_file.exists():
+            try:
+                port = int(port_file.read_text().splitlines()[0])
+            except (ValueError, IndexError):
+                return
+            state_path.write_text(json.dumps({
+                "job_id": job_id, "port": port, "job_url": job_url,
+                "started_at": time.time(),
+            }))
+            return
+        time.sleep(0.25)
+
+
+def _inject_review_banner(page, platform: str, items: list[str] | None, unanswered_count: int = 0):
     """Injects a fixed-position overlay directly onto the visible page
-    listing what this handler couldn't fill in — pure DOM/CSS added to
+    listing what this handler couldn't fill in (plus, now, what it reused
+    from a saved profile_answers entry) — pure DOM/CSS added to
     `document.body` via page.evaluate(), doesn't touch any form field or
     the iframe a platform like Greenhouse renders its form inside, and
     can't submit anything. Collapsed to a small badge by default (a full
     list permanently covering the page would just get in the way); click
     it to expand. Injected on the *top-level* page even when the actual
     form lives in a cross-origin iframe, so it stays visible regardless of
-    where the fields it's describing actually are."""
+    where the fields it's describing actually are.
+
+    `unanswered_count` drives the badge (still-needs-a-human count) —
+    `items` may also include "reused saved answer" lines ahead of the real
+    needs_review ones, which shouldn't make the badge look scarier than it
+    is."""
     import json
 
-    items = needs_review or []
-    payload = json.dumps({"platform": platform, "items": items})
+    items = items or []
+    payload = json.dumps({"platform": platform, "items": items, "unanswered_count": unanswered_count})
     page.evaluate(
         """(data) => {
             const items = data.items;
@@ -172,9 +243,10 @@ def _inject_review_banner(page, platform: str, needs_review: list[str] | None):
             box.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;'
                 + 'font-family:-apple-system,sans-serif;font-size:13px;max-width:360px;'
                 + 'box-shadow:0 2px 12px rgba(0,0,0,.35);';
-            const badgeColor = items.length ? '#c0392b' : '#1e8449';
-            const badgeText = items.length
-                ? `⚠ ${items.length} item${items.length === 1 ? '' : 's'} need your input`
+            const count = data.unanswered_count;
+            const badgeColor = count ? '#c0392b' : '#1e8449';
+            const badgeText = count
+                ? `⚠ ${count} item${count === 1 ? '' : 's'} need your input`
                 : '✓ Auto-filled, ready to review';
             box.innerHTML = `
                 <div id="__retiarius_badge" style="background:${badgeColor};color:#fff;padding:8px 14px;`

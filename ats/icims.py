@@ -15,6 +15,17 @@ safe field (email — just typing text) and stops there. Whether every iCIMS
 tenant gates behind hCaptcha the same way hasn't been confirmed; the handler
 flags whichever gate elements it actually finds rather than assuming.
 
+Confirmed live 2026-08-27 on Kilpatrick Townsend's tenant: this email/GDPR/
+hCaptcha step isn't the only gate. Getting past it (done manually, outside
+this handler, since it needs the captcha solved) lands on a "Candidate
+Profile" page with its own mandatory "Create a login to access your
+application" section — a second, later account-creation wall, same
+category as ats/workday.py's. This handler has no way to reach or confirm
+that page itself (it correctly never tries to click past the hCaptcha), so
+it can't detect this gate directly — it just tells the user up front to
+expect it, so solving the captcha doesn't feel like it "failed" when a
+real further requirement shows up right after.
+
 Two real bugs found and fixed live 2026-08-27, running the actual
 prepare_application() pipeline against fresh PPPL and Iridium postings:
 (1) `_content_frame`'s "first frame whose URL contains icims.com" check
@@ -87,6 +98,24 @@ def fill_application(page: Page, resume: dict) -> dict:
             "iCIMS requires solving an hCaptcha challenge on this step — "
             "email is pre-filled, solve the captcha and click Next yourself."
         )
+
+    # Confirmed live 2026-08-27 on a Kilpatrick Townsend posting: this
+    # tenant's flow doesn't stop at the hCaptcha step — clicking past it
+    # lands on a "Candidate Profile" page with its own further "Create a
+    # login to access your application" requirement, the same kind of
+    # mandatory account-creation wall ats/workday.py already documents.
+    # This handler still can't (and shouldn't) automate past the hCaptcha
+    # to check for that wall on every tenant, so this is a heads-up rather
+    # than a detected gate — without it, the previous message read as "do
+    # these two things and you're through," when a real account-creation
+    # step was one click further and easy to hit unprepared.
+    needs_review.append(
+        "After that: at least on some tenants (confirmed on Kilpatrick "
+        "Townsend), continuing lands on a 'Candidate Profile' page that "
+        "also requires creating a login/account before the real "
+        "application form appears — same category of gate as Workday's. "
+        "Not solved here; just don't be surprised by it."
+    )
 
     return {"platform": "icims", "needs_review": needs_review, "submitted": False}
 

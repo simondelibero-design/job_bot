@@ -74,28 +74,55 @@ matching fields by label text the way ats/ashby.py locates LinkedIn,
 rather than assuming a fixed id — not done here given the scope already
 covered this session.
 """
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent))
+
 from playwright.sync_api import Page
+
+from config import LOCATION
+from db.database import lookup_profile_answer
 
 
 def fill_application(page: Page, resume: dict) -> dict:
     """Fills known fields on a Greenhouse application — either a native
     `boards.greenhouse.io` page, or one embedded via `gh_jid=` in another
     company's own page (see module docstring). Returns
-    {"platform": "greenhouse", "needs_review": [...]}."""
+    {"platform": "greenhouse", "needs_review": [...], "auto_answered": [...]}.
+
+    Resume is uploaded FIRST, before any other field, then given a beat to
+    let the page's own JS react to it — some Greenhouse tenants parse an
+    uploaded resume and populate name/email/phone themselves. Our own
+    `fill_if_present` only ever fills a field that's still empty afterward,
+    so a genuine native autofill always wins; ours is strictly the backup,
+    not a fight over the same field."""
     ctx = _resolve_context(page)
     unanswered = []
+    auto_answered = []
 
-    def fill_if_present(selector: str, value: str | None):
-        if not value:
-            return
-        el = ctx.query_selector(selector)
-        if el:
-            el.fill(value)
-
-    fill_if_present("#first_name", resume.get("first_name"))
-    fill_if_present("#last_name", resume.get("last_name"))
-    fill_if_present("#email", resume.get("email"))
-    fill_if_present("#phone", resume.get("phone"))
+    # Confirmed live 2026-08-27 on a dead Waymo job URL (posting had moved/
+    # expired — the page rendered Waymo's generic "Oops! Looks like you're
+    # lost." 404, not a form): when _resolve_context() falls through to its
+    # last-resort bare `page` return, the aria-required scan below correctly
+    # finds nothing on a page with no form on it at all — and an empty
+    # needs_review list was then silently reported as "Auto-filled, ready to
+    # review", a real false positive (verified via a live screenshot of the
+    # actual 404 page, not just the returned dict). None of the known
+    # standard fields existing at all is the honest signal that this isn't
+    # a real Greenhouse application page, regardless of what the later scan
+    # finds or doesn't find.
+    if not any(ctx.query_selector(sel) for sel in ("#first_name", "#email", "#resume")):
+        return {
+            "platform": "greenhouse",
+            "needs_review": [
+                "Couldn't find a Greenhouse application form on this page "
+                "(the posting may have moved, expired, or the layout "
+                "doesn't match what this handler expects) — nothing was "
+                "auto-filled. Review and apply manually."
+            ],
+            "auto_answered": [], "submitted": False,
+        }
 
     resume_pdf = resume.get("resume_pdf_path")
     resume_input = ctx.query_selector("#resume")
@@ -103,6 +130,7 @@ def fill_application(page: Page, resume: dict) -> dict:
     if resume_input and resume_pdf:
         resume_input.set_input_files(resume_pdf)
         resume_uploaded = True
+        ctx.wait_for_timeout(1200)  # let any native resume-parse autofill react
         # On some tenants (confirmed live 2026-08-27 on PsiQuantum) the
         # #resume node gets swapped out for a "file attached" widget right
         # after a successful upload, and whatever replaces it can still
@@ -112,8 +140,26 @@ def fill_application(page: Page, resume: dict) -> dict:
         # shows up in the rendered page). Filtered out by label text below
         # now that upload success is tracked explicitly.
 
+    def fill_if_present(selector: str, value: str | None):
+        if not value:
+            return
+        el = ctx.query_selector(selector)
+        if not el:
+            return
+        if (el.input_value() or "").strip():
+            return  # already populated (native resume-parse autofill) — don't overwrite it
+        el.fill(value)
+
+    fill_if_present("#first_name", resume.get("first_name"))
+    fill_if_present("#last_name", resume.get("last_name"))
+    fill_if_present("#email", resume.get("email"))
+    fill_if_present("#phone", resume.get("phone"))
+
     # Anything else required on the form is a per-posting custom question
-    # (or an EEO/demographic dropdown) — surface it instead of guessing.
+    # (or an EEO/demographic dropdown) — surface it instead of guessing,
+    # unless we've already got a saved answer for this exact prompt from a
+    # past application (see db/database.py's profile_answers table, fed by
+    # the /profile and /struggles-to-answer dashboard pages).
     # `[aria-required="true"]` is the real signal on Greenhouse's current
     # form, not the plain HTML `required` attribute — see module docstring.
     known_ids = {"first_name", "last_name", "email", "phone", "resume", "country"}
@@ -124,11 +170,97 @@ def fill_application(page: Page, resume: dict) -> dict:
         label = _label_for(ctx, el)
         if resume_uploaded and label and "resume" in label.lower():
             continue  # see resume_uploaded note above — a real upload, not a real gap
+
+        if el_id == "candidate-location" and _fill_location_combobox(ctx, el):
+            continue  # real geocode autocomplete, not a saved Q&A — see helper below
+
+        saved_answer = lookup_profile_answer(label) if label else None
+        if saved_answer and _try_answer_field(ctx, el, saved_answer):
+            auto_answered.append(f"{label}: {saved_answer}")
+            continue
+
         if el.get_attribute("role") == "combobox":
             label = f"{label or el_id} (dropdown/combobox — needs a real selection, not just typed text)"
         unanswered.append(label or f"(unlabeled field: {el_id or el.get_attribute('name')})")
 
-    return {"platform": "greenhouse", "needs_review": unanswered, "submitted": False}
+    return {
+        "platform": "greenhouse", "needs_review": unanswered,
+        "auto_answered": auto_answered, "submitted": False,
+    }
+
+
+def _fill_location_combobox(ctx, el, city: str = None, state: str = None) -> bool:
+    """Fills Greenhouse's real geocoded `#candidate-location` field — a
+    react-select autocomplete (id="candidate-location", options rendered as
+    `#react-select-candidate-location-option-N`), not a plain text input or
+    a fixed-choice custom question, so it needs a suggestion actually
+    clicked rather than just typed text. Confirmed live 2026-08-27 on a
+    real SpaceX posting: typing "{city}, {state}" reliably surfaces the
+    correct US city as its own suggestion (Playwright's `.type()`, not
+    `.fill()`, since react-select needs real keystroke events to trigger
+    its debounced search — confirmed `.type()` works via a live screenshot
+    before this was wired in). Matches on "United States" in the option
+    text rather than blindly taking the first result, since a same-named
+    foreign town (e.g. "Milton, Wales, United Kingdom") can also appear in
+    the list. Returns False (leaving the field for manual review, not a
+    false claim of success) if no US match shows up in time."""
+    city = city or LOCATION["city"]
+    state = state or LOCATION["state"]
+    field_id = el.get_attribute("id")
+    if not field_id:
+        return False
+    try:
+        el.click()
+        el.type(f"{city}, {state}")
+        ctx.wait_for_timeout(700)
+        option = ctx.query_selector(
+            f'[id^="react-select-{field_id}-option"]:has-text("United States")'
+        )
+        if option:
+            option.click()
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _try_answer_field(ctx, el, answer: str) -> bool:
+    """Applies a previously saved answer to a required field, using the
+    interaction its element type actually needs — a plain `.fill()` types
+    text but never performs the click/selection a combobox or <select>
+    needs to register a real answer (see module docstring on why those are
+    normally flagged instead of guessed). Returns True only if the value
+    visibly landed; False leaves the field for manual review rather than
+    silently claiming an answer that didn't actually take."""
+    tag = (el.evaluate("e => e.tagName") or "").lower()
+    role = el.get_attribute("role")
+
+    if tag == "select":
+        try:
+            el.select_option(label=answer)
+            return True
+        except Exception:
+            return False
+
+    if role == "combobox":
+        try:
+            el.click()
+            ctx.wait_for_timeout(250)
+            el.fill(answer)
+            ctx.wait_for_timeout(400)
+            option = ctx.query_selector(f'[role="option"]:has-text("{answer}")')
+            if option:
+                option.click()
+                return True
+        except Exception:
+            pass
+        return False
+
+    if tag in ("input", "textarea"):
+        el.fill(answer)
+        return True
+
+    return False
 
 
 def _resolve_context(page: Page):
