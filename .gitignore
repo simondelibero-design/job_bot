@@ -20,6 +20,10 @@ db/jobs.db
 # Home page's sweep-in-progress tracker — ephemeral runtime state
 dashboard/.sweep_lock.json
 
+# Per-window CDP live-view state (ats/apply.py / ats/watch_window.py) —
+# ephemeral, references a port on a browser process that may already be gone
+dashboard/.live_view/
+
 # User-adjustable distance/radius settings (close/mid/far tiers, life_change
 # search radius) — local machine preference, not project source
 dashboard/settings.json
